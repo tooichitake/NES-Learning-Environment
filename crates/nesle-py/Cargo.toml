@@ -1,0 +1,34 @@
+[package]
+name = "nesle-py"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[lib]
+name = "_nesle"
+crate-type = ["cdylib", "rlib"]
+
+[features]
+# Audio synthesis is OFF by default for RL training throughput. Enable for
+# the APU raw-output diagnostic (scripts/apu_channel_probe.py) or audio
+# frontends: `cargo build -p nesle-py --features audio-synth`.
+audio-synth = ["nesle-core/audio-synth", "nesle-rl/audio-synth"]
+
+# In-process SDL2 window for gym `render_mode="human"` (the ALE `SDL_SUPPORT`
+# analogue). OFF by default so headless training never links SDL2; enable with
+# `maturin develop --features viewer`.
+viewer = ["dep:sdl2"]
+
+[dependencies]
+nesle-common = { path = "../nesle-common" }
+# default-features = false disables `audio-synth` so PPO training builds
+# skip the per-CPU-cycle channel-tick + sample-emit hot path entirely.
+# Frontends that want audio depend on nesle-rl / nesle-core with the
+# `audio-synth` feature enabled.
+nesle-core = { path = "../nesle-core", default-features = false }
+nesle-rl = { path = "../nesle-rl" }
+# SDL2 human-window backend for render_mode="human" (in crate::viewer); linked
+# only by the `viewer` feature, so headless training never links SDL2.
+sdl2 = { version = "0.37", optional = true }
+pyo3 = { version = "0.22", features = ["extension-module", "abi3-py310"] }

@@ -1,0 +1,40 @@
+# Cargo workspace + maturin build output
+target/
+*.pyd
+*.so
+*.pdb
+wheels/
+dist/
+build/
+
+# The compiled extension lands next to the Python sources during `maturin develop`
+crates/nesle-py/python/nesle/_nesle*
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Editor / local runtime state
+.vscode/
+.idea/
+.env
+.env.*
+
+# Copyrighted ROMs are NEVER committed (ale-py model). They live only in local
+# checkouts and are injected into the wheel at build time from a private source
+# (see .github/workflows/build-wheels.yml). Users of a ROM-free wheel supply
+# their own via rom_path= / NESLE_ROMS_DIR / nesle.import_roms(...).
+crates/nesle-py/python/nesle/roms/*.nes
+/roms/
+
+# CI ROM staging + PGO build artifacts
+.roms-private/
+pgo-data/
+build-instr/
+pgo-rom.nes
+dist-base/
+dist-pgo/

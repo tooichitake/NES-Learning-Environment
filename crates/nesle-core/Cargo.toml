@@ -1,0 +1,17 @@
+[package]
+name = "nesle-core"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[features]
+# Audio synthesis (4-channel APU + non-linear mixer + filter). Adds
+# ~1.78 M ops/sec of per-CPU-cycle work — keep it OFF for RL training
+# (nesle-py / nesle-rl by default) and ON for interactive frontends
+# (nesle-server --features audio-synth; nesle-py viewer feature).
+default = ["audio-synth"]
+audio-synth = []
+
+[dependencies]
+nesle-common = { path = "../nesle-common" }

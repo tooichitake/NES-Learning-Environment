@@ -1,0 +1,104 @@
+name: build-wheels
+
+# Build fully-optimized abi3 `nesle` wheels (release thin-LTO/cgu=1 + target-cpu
+# baseline + source-level SIMD/enum/cache + optional PGO) for:
+#   * linux   x86_64  (ubuntu-latest)
+#   * windows x86_64  (windows-latest)
+#   * macos   arm64   (macos-14, Apple Silicon)
+# and upload them as GitHub Actions artifacts (+ attach to a Release on tags).
+# abi3-py310 -> ONE wheel per platform covers Python 3.10+.
+#
+# ROMs (copyrighted) are NEVER committed to this public repo -- the ale-py model.
+# Instead CI injects them at build time from a PRIVATE source so the released
+# wheel ships complete while the source tree stays ROM-free:
+#   * secret  ROMS_DEPLOY_KEY -- a read-only SSH deploy key for the private ROM repo.
+#   * var     ROMS_REPO       -- "owner/name" of that repo (default: <owner>/nesle-roms).
+# When ROMS_DEPLOY_KEY is unset (e.g. fork PRs) CI builds a ROM-free wheel and skips
+# PGO -- it never fails just because the private ROMs are absent. Users of a
+# ROM-free wheel supply their own ROM via rom_path= / NESLE_ROMS_DIR /
+# nesle.import_roms(...). See README "ROMs".
+#
+# PGO uses the staged mapper-diverse ROM set (scripts/pgo_workload.py: all 9
+# supported mappers + the SMB1 preprocess path) so the profile is not biased to
+# one game. A single base64 ROM in secret PGO_ROM_B64 is an alternative PGO
+# workload when the full private set is unavailable.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["main"]   # auto-build wheels on every push to main
+    tags: ["v*"]
+
+jobs:
+  wheels:
+    name: wheel ${{ matrix.target }}
+    runs-on: ${{ matrix.os }}
+    env:
+      ROMS_DEPLOY_KEY: ${{ secrets.ROMS_DEPLOY_KEY }}   # surfaced as env so `if:` can gate on it
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            cpu: x86-64-v3        # AVX2 (Haswell/Zen1+, 2013+); x86-64-v2 for older CPUs
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            cpu: x86-64-v3
+          - os: macos-14
+            target: aarch64-apple-darwin
+            cpu: apple-m1
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Rust toolchain (+ llvm-tools for PGO)
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+          components: llvm-tools-preview
+
+      - uses: Swatinem/rust-cache@v2
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install build tooling
+        run: python -m pip install --upgrade "maturin>=1.7,<2" numpy "gymnasium>=1.0"
+
+      # Private ROM injection (skipped when ROMS_PAT is unset -> ROM-free wheel).
+      - name: Fetch private ROMs
+        if: ${{ env.ROMS_DEPLOY_KEY != '' }}
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ vars.ROMS_REPO || format('{0}/nesle-roms', github.repository_owner) }}
+          ssh-key: ${{ secrets.ROMS_DEPLOY_KEY }}
+          path: .roms-private
+
+      - name: Stage private ROMs into the package
+        if: ${{ env.ROMS_DEPLOY_KEY != '' }}
+        run: python scripts/stage_roms.py .roms-private crates/nesle-py/python/nesle/roms
+
+      - name: Build optimized abi3 wheel (release + target-cpu + PGO when a ROM is present)
+        run: python scripts/ci_pgo_build.py --target ${{ matrix.target }} --cpu ${{ matrix.cpu }} --out dist
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nesle-${{ matrix.target }}
+          path: dist/*.whl
+          if-no-files-found: error
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: wheels
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: wheels
+          merge-multiple: true
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: wheels/*.whl

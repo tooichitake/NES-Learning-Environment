@@ -1,0 +1,25 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/nesle-common",
+    "crates/nesle-core",
+    "crates/nesle-rl",
+    "crates/nesle-py",
+]
+
+[workspace.package]
+edition = "2021"
+version = "0.1.0"
+license = "GPL-2.0-only"
+rust-version = "1.85"
+
+# Profiles apply to all workspace members. Per-crate overrides are not
+# allowed in a virtual workspace, so all release builds share these flags.
+[profile.release]
+opt-level = 3
+codegen-units = 1
+lto = "thin"
+panic = "abort"
+
+[profile.dev]
+panic = "abort"

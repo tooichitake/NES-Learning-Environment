@@ -1,0 +1,39 @@
+[package]
+name = "nesle-rl"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[features]
+# Default OFF for RL training throughput. Frontends (wasm, viewer)
+# explicitly enable via `features = ["audio-synth"]`.
+default = []
+audio-synth = ["nesle-core/audio-synth"]
+# Phase C of kernel optimization plan: SIMD-accelerated alternative
+# resize backend via `fast_image_resize` (x86_64 AVX2/SSE4.1 + aarch64
+# NEON runtime feature detect). Not the default because the SIMD
+# filter is not byte-exact OpenCV INTER_AREA (which is what
+# `resize_area_gray_into` produces and what existing RL observations
+# match). Opt-in for users who want the throughput and don't depend on
+# observation byte identity.
+simd-preprocess = ["dep:fast_image_resize"]
+
+[dependencies]
+nesle-common = { path = "../nesle-common" }
+nesle-core = { path = "../nesle-core", default-features = false }
+# Worker-pool vector env (vector.rs): MPMC action/completion queues between the
+# Python caller and a pool of worker threads that step the independent envs with
+# the GIL released (RL layer only; the emulator core stays single-threaded +
+# TLS-free). crossbeam-channel is a lock-free MPMC channel (multiple workers
+# receive from one action queue, one consumer drains completions) -- std::sync::mpsc
+# is single-consumer and won't fan out.
+crossbeam-channel = "0.5"
+# Optional SIMD resize backend, gated by `simd-preprocess` feature. Built
+# from per-target runtime CPU feature detection (no compile-time arch lock).
+fast_image_resize = { version = "5", optional = true }
+# Portable, zero-`unsafe` SIMD for the default byte-exact INTER_AREA resize
+# (P.1). `i32x8` / `u8x16` lower to AVX2/SSE2 on x86_64 and NEON on aarch64 with
+# no compile-time arch lock -- the vertical (row-combine) pass loads contiguous
+# source rows and MACs them, which is where the resize spends most of its time.
+wide = "0.7"
