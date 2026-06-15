@@ -2,14 +2,15 @@
 
 from __future__ import annotations
 
+import argparse
 import asyncio
 import json
 import struct
 from typing import Any, Callable
 
+import nesle
 import numpy as np
 import websockets
-
 from nesle.registration import rom_key_for_env_id
 
 Policy = Callable[[np.ndarray], int]
@@ -22,7 +23,11 @@ def parse_state(buf: bytes) -> tuple[dict[str, Any], np.ndarray]:
     off = 4 + mlen + meta["native_w"] * meta["native_h"] * 3
     channels = int(meta.get("obs_channels", 1))
     n = meta["obs_w"] * meta["obs_h"] * channels
-    shape = (meta["obs_h"], meta["obs_w"]) if channels == 1 else (meta["obs_h"], meta["obs_w"], channels)
+    shape = (
+        (meta["obs_h"], meta["obs_w"])
+        if channels == 1
+        else (meta["obs_h"], meta["obs_w"], channels)
+    )
     obs = np.frombuffer(buf, dtype=np.uint8, count=n, offset=off).reshape(shape)
     return meta, obs
 
@@ -50,8 +55,6 @@ class AgentClient:
     ) -> dict[str, Any]:
         """Run an obs-to-action loop and return the last state metadata."""
         rng = np.random.default_rng(seed)
-        import nesle
-
         nesle.register_envs()
         game_id = rom_key_for_env_id(env_id)
         async with websockets.connect(self.uri, max_size=None) as ws:
@@ -104,9 +107,8 @@ class AgentClient:
             self.action_masks = list(m.get("action_masks", []))
             self.players = int(m.get("players", 1))
 
-def _main() -> None:
-    import argparse
 
+def _main() -> None:
     ap = argparse.ArgumentParser(description="nesle-server agent player-client")
     ap.add_argument("--uri", default="ws://127.0.0.1:8090/ws")
     ap.add_argument("--name", default=None, help="display label shown in UIs (else 'Agent N')")

@@ -39,7 +39,8 @@ pub static BOMBERMAN_2_VS_2P: GameSpec = GameSpec {
     terminal: bomberman_2_terminal_2p,
     lives: bomberman_2_lives,
     in_transition: None,
-    per_agent_lives_termination: true,};
+    per_agent_lives_termination: true,
+};
 
 pub static BOMBERMAN_2_BATTLE_3P: GameSpec = GameSpec {
     id: "bomberman_2_battle_3p",
@@ -55,7 +56,8 @@ pub static BOMBERMAN_2_BATTLE_3P: GameSpec = GameSpec {
     terminal: bomberman_2_terminal_3p,
     lives: bomberman_2_lives,
     in_transition: None,
-    per_agent_lives_termination: true,};
+    per_agent_lives_termination: true,
+};
 
 /// Bomberman II (Hudson Soft, 1991), NES, MMC1 -single-player NORMAL MODE
 /// story campaign (the 50-area dungeon-crawl, as opposed to VS_2P / BATTLE_3P
@@ -101,7 +103,8 @@ pub static BOMBERMAN_2_NORMAL: GameSpec = GameSpec {
     terminal: bomberman_2_normal_terminal,
     lives: bomberman_2_normal_lives,
     in_transition: None,
-    per_agent_lives_termination: false,};
+    per_agent_lives_termination: false,
+};
 
 /// Minimal Bomberman action set: NOOP + 4-way move + lay-bomb (A). Grid-based,
 /// so no diagonals. Composite move+A actions are intentionally omitted -- under
@@ -256,8 +259,7 @@ fn bomberman_2_vs_dense_reward(prev_ram: &[u8; 0x800], cur_ram: &[u8; 0x800]) ->
     for (p, slot) in r.iter_mut().take(2).enumerate() {
         let o = 1 - p;
         // Signed pixels p moved toward the opponent this frame (opp held; toward +, away -).
-        let toward =
-            vs_pixel_dist(prev_ram, p, cur_ram, o) - vs_pixel_dist(cur_ram, p, cur_ram, o);
+        let toward = vs_pixel_dist(prev_ram, p, cur_ram, o) - vs_pixel_dist(cur_ram, p, cur_ram, o);
         let approach = if toward.abs() <= VS_MAX_STEP_PX {
             (VS_APPROACH_SCALE * toward) as f32
         } else {
@@ -296,7 +298,8 @@ fn bomberman_2_normal_score(ram: &[u8; 0x800]) -> u32 {
 fn bomberman_2_normal_reward(previous_ram: &[u8; 0x800], current_ram: &[u8; 0x800]) -> [f32; 4] {
     solo_reward({
         let score_reward = bomberman_2_normal_score(current_ram)
-            .saturating_sub(bomberman_2_normal_score(previous_ram)) as f32
+            .saturating_sub(bomberman_2_normal_score(previous_ram))
+            as f32
             * 0.01;
         let lives_prev = previous_ram[0x04E5];
         let lives_cur = current_ram[0x04E5];

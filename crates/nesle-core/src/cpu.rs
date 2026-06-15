@@ -404,7 +404,10 @@ impl Cpu {
     /// Phase E.3: `#[cold]` — called once per ROM load + once per
     /// `Core::reset()`, never on the per-frame hot path.
     #[cold]
-    pub fn run_power_on_reset_warmup<M: Mapper + ?Sized>(&mut self, ctx: &mut CpuBusContext<'_, M>) {
+    pub fn run_power_on_reset_warmup<M: Mapper + ?Sized>(
+        &mut self,
+        ctx: &mut CpuBusContext<'_, M>,
+    ) {
         self.cycles = u64::MAX;
         self.master_clock = 0;
         self.ppu_offset = 1;
@@ -490,7 +493,11 @@ impl Cpu {
     /// the hint the compiler still inlines in opt-level=3 + LTO, but
     /// the explicit attribute survives refactors.
     #[inline]
-    pub fn start_cpu_cycle<M: Mapper + ?Sized>(&mut self, is_read: bool, ctx: &mut CpuBusContext<'_, M>) {
+    pub fn start_cpu_cycle<M: Mapper + ?Sized>(
+        &mut self,
+        is_read: bool,
+        ctx: &mut CpuBusContext<'_, M>,
+    ) {
         let clocks: u64 = if is_read {
             u64::from(self.start_clock_count).wrapping_sub(1)
         } else {
@@ -528,7 +535,11 @@ impl Cpu {
     /// (NesCpu.cpp:294-315). Samples NMI/IRQ edges off `ctx.interrupt`.
     /// Phase E.4: see `start_cpu_cycle` for inline rationale.
     #[inline]
-    pub fn end_cpu_cycle<M: Mapper + ?Sized>(&mut self, is_read: bool, ctx: &mut CpuBusContext<'_, M>) {
+    pub fn end_cpu_cycle<M: Mapper + ?Sized>(
+        &mut self,
+        is_read: bool,
+        ctx: &mut CpuBusContext<'_, M>,
+    ) {
         let clocks: u64 = if is_read {
             u64::from(self.end_clock_count).wrapping_add(1)
         } else {
@@ -639,7 +650,11 @@ impl Cpu {
     /// `IndYW`, `AbsXW`, `AbsYW`, and the page-cross dummy on `IndY`/
     /// `AbsX`/`AbsY` reads), the dummy reads are issued here via
     /// `memory_read(..., DummyRead)` so PPU/APU/mapper hooks see them.
-    pub fn fetch_operand<M: Mapper + ?Sized>(&mut self, mode: AddrMode, ctx: &mut CpuBusContext<'_, M>) -> u16 {
+    pub fn fetch_operand<M: Mapper + ?Sized>(
+        &mut self,
+        mode: AddrMode,
+        ctx: &mut CpuBusContext<'_, M>,
+    ) -> u16 {
         match mode {
             AddrMode::Imp | AddrMode::Acc => {
                 // Mesen2: `DummyRead` of next-byte without PC increment.
@@ -717,7 +732,11 @@ impl Cpu {
     /// dummy read even when no page cross occurs (required for store
     /// opcodes). Mesen2 equivalent: `NesCpu::GetIndYAddr`
     /// (NesCpu.h:264-282).
-    fn fetch_indirect_y<M: Mapper + ?Sized>(&mut self, write_form: bool, ctx: &mut CpuBusContext<'_, M>) -> u16 {
+    fn fetch_indirect_y<M: Mapper + ?Sized>(
+        &mut self,
+        write_form: bool,
+        ctx: &mut CpuBusContext<'_, M>,
+    ) -> u16 {
         let zero = self.read_byte_mc(ctx);
         let base = if zero == 0xFF {
             let lo = self.memory_read(0x00FF, MemoryOperationType::Read, ctx);
@@ -974,7 +993,11 @@ impl Cpu {
         value
     }
 
-    fn dma_external_read<M: Mapper + ?Sized>(&mut self, addr: u16, ctx: &mut CpuBusContext<'_, M>) -> u8 {
+    fn dma_external_read<M: Mapper + ?Sized>(
+        &mut self,
+        addr: u16,
+        ctx: &mut CpuBusContext<'_, M>,
+    ) -> u8 {
         if (0x4000..=0x401f).contains(&addr) {
             ctx.bus.cpu_open_bus()
         } else {

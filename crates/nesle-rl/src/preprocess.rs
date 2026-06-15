@@ -7,12 +7,12 @@ mod window;
 
 pub use config::{ObsConfig, ObsKind, ObsShape, RenderPolicy, RewardClip};
 pub use pipeline::{ObsPipeline, ObsStepMeta};
+#[cfg(feature = "simd-preprocess")]
+pub use resize::SimdResizer;
 pub use resize::{
     compute_obs, compute_obs_into, resize_area_gray, resize_area_gray_into, resize_area_rgb_into,
     ResizePlan,
 };
-#[cfg(feature = "simd-preprocess")]
-pub use resize::SimdResizer;
 pub use window::{FrameSample, ObsWindow, ObsWindowStep};
 
 #[cfg(test)]
@@ -307,8 +307,7 @@ mod tests {
     #[test]
     fn stack_pads_on_reset_and_rolls_newest_last() {
         // ale-py frame stacking: reset pads every slot, then each step rolls the newest frame in last.
-        let cfg =
-            ObsConfig::gray(1, 8, false, RenderPolicy::HumanVisible, false).with_stack_num(3);
+        let cfg = ObsConfig::gray(1, 8, false, RenderPolicy::HumanVisible, false).with_stack_num(3);
         let frame_len = 8 * 8;
         let mut window = ObsWindow::new(cfg);
         let lives = [0, 0, 0, 0];
@@ -478,7 +477,10 @@ mod tests {
                 false,
             )
             .unwrap();
-        assert!(!step.terminated, "a drop in an unused slot must not end the episode");
+        assert!(
+            !step.terminated,
+            "a drop in an unused slot must not end the episode"
+        );
         // A real active-port life loss (P1 alive 1->0) still terminates.
         let step = window
             .push_frame(
@@ -496,7 +498,10 @@ mod tests {
                 false,
             )
             .unwrap();
-        assert!(step.terminated, "an active port's life loss must end the episode");
+        assert!(
+            step.terminated,
+            "an active port's life loss must end the episode"
+        );
     }
 
     #[test]

@@ -19,8 +19,7 @@ pub(crate) fn rom_path(name: &str) -> Option<PathBuf> {
 pub(crate) fn load_test_rom() -> Vec<u8> {
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
     let path = root.join("crates/nesle-py/python/nesle/roms/super-mario-bros.nes");
-    fs::read(&path)
-        .unwrap_or_else(|_| panic!("test ROM must be present at {}", path.display()))
+    fs::read(&path).unwrap_or_else(|_| panic!("test ROM must be present at {}", path.display()))
 }
 
 pub(crate) fn action_mask(game: &GameSpec, name: &str) -> u8 {
@@ -57,11 +56,7 @@ pub(crate) fn smoke_single_player_actions(
     }
 }
 
-pub(crate) fn smoke_multiplayer_actions(
-    game: &'static GameSpec,
-    rom_name: &str,
-    actions: &[&str],
-) {
+pub(crate) fn smoke_multiplayer_actions(game: &'static GameSpec, rom_name: &str, actions: &[&str]) {
     let Some(path) = rom_path(rom_name) else {
         return;
     };

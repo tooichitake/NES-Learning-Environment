@@ -9,10 +9,10 @@ import gymnasium as gym
 import numpy as np
 from gymnasium import spaces
 from gymnasium.utils import EzPickle
-
-from . import _nesle
 from nesle.registration import resolve_env_id
 from nesle.roms import resolve_rom
+
+from . import _nesle
 
 # PettingZoo is OPTIONAL (only NESMultiPlayerEnv needs it); single-agent users never pull it in.
 try:
@@ -34,14 +34,12 @@ class NESSinglePlayerEnv(gym.Env, EzPickle):
         rom_path: str | Path | None = None,
         obs_type: str = "ram",
         render_mode: str | None = None,
-        frameskip: int = 1,
+        frame_skip: int = 1,
         repeat_action_probability: float = 0.0,
         full_action_space: bool = False,
         remove_sprite_limit: bool = False,
         max_num_frames_per_episode: int | None = None,
         _level_state: str | None = None,
-        mode: int = 0,
-        difficulty: int = 0,
     ) -> None:
         EzPickle.__init__(
             self,
@@ -49,26 +47,20 @@ class NESSinglePlayerEnv(gym.Env, EzPickle):
             rom_path=rom_path,
             obs_type=obs_type,
             render_mode=render_mode,
-            frameskip=frameskip,
+            frame_skip=frame_skip,
             repeat_action_probability=repeat_action_probability,
             full_action_space=full_action_space,
             remove_sprite_limit=remove_sprite_limit,
             max_num_frames_per_episode=max_num_frames_per_episode,
             _level_state=_level_state,
-            mode=mode,
-            difficulty=difficulty,
         )
         if obs_type not in ("ram", "rgb", "grayscale"):
             raise ValueError("obs_type must be one of: ram, rgb, grayscale")
         if render_mode not in (None, "rgb_array", "human"):
             raise ValueError(f"unsupported render_mode: {render_mode}")
-        if mode != 0:
-            raise ValueError(f"mode {mode} unsupported (NES has no ALE-style game modes; only 0)")
-        if difficulty != 0:
-            raise ValueError(f"difficulty {difficulty} unsupported (NES has no ALE-style difficulties; only 0)")
         self.game_id = game_id
         self.obs_type = obs_type
-        self.frameskip = frameskip
+        self.frame_skip = frame_skip
         self.render_mode = render_mode
         self.full_action_space = full_action_space
         self._env = _nesle.NesEnv(game_id)
@@ -77,13 +69,15 @@ class NESSinglePlayerEnv(gym.Env, EzPickle):
             self._env.set_start_state(str(_level_state))
         self._env.load_rom_bytes(resolve_rom(game_id, rom_path).read_bytes())
         self._env.set_max_episode_frames(max_num_frames_per_episode)
-        self._env.set_action_repeat(frameskip, repeat_action_probability)
+        self._env.set_action_repeat(frame_skip, repeat_action_probability)
         self._env.set_remove_sprite_limit(remove_sprite_limit)
         self._actions = (
             self._env.full_action_set() if full_action_space else self._env.minimal_action_set()
         )
         self.action_space = spaces.Discrete(len(self._actions))
-        self.observation_space = spaces.Box(low=0, high=255, shape=self._obs_shape(), dtype=np.uint8)
+        self.observation_space = spaces.Box(
+            low=0, high=255, shape=self._obs_shape(), dtype=np.uint8
+        )
         self._human = None
 
     def reset(self, *, seed: int | None = None, options: dict[str, Any] | None = None):
@@ -111,7 +105,9 @@ class NESSinglePlayerEnv(gym.Env, EzPickle):
                 self._env.step_human(mask, window)
             )
         else:
-            reward, terminated, truncated, frame_number, episode_frame_number, lives = self._env.step(mask)
+            reward, terminated, truncated, frame_number, episode_frame_number, lives = (
+                self._env.step(mask)
+            )
         info = self._info(frame_number, episode_frame_number, lives)
         return (
             self._obs(),
@@ -158,6 +154,10 @@ class NESSinglePlayerEnv(gym.Env, EzPickle):
     def get_ram(self) -> np.ndarray:
         return np.frombuffer(self._env.ram(), dtype=np.uint8).copy()
 
+    def get_nametable(self) -> np.ndarray:
+        """Full PPU nametable / CIRAM tile field (rendered walls / bricks / floor / ...)."""
+        return np.frombuffer(self._env.nametable(), dtype=np.uint8).copy()
+
     def set_ram(self, ram) -> None:
         arr = np.asarray(ram, dtype=np.uint8)
         if arr.shape != (2048,):
@@ -199,8 +199,16 @@ class NESSinglePlayerEnv(gym.Env, EzPickle):
         Keys: W/A/S/D = D-pad, k = A, j = B, n = Select, m = Start; no keys =
         NOOP. (A standalone native keyboard player is also ``python -m nesle.play``.)
         """
-        button_key = {0x10: "w", 0x20: "s", 0x40: "a", 0x80: "d",
-                      0x01: "k", 0x02: "j", 0x04: "n", 0x08: "m"}
+        button_key = {
+            0x10: "w",
+            0x20: "s",
+            0x40: "a",
+            0x80: "d",
+            0x01: "k",
+            0x02: "j",
+            0x04: "n",
+            0x08: "m",
+        }
         mapping: dict[tuple[str, ...], int] = {}
         for index, (_, mask) in enumerate(self._actions):
             if mask == 0:
@@ -232,6 +240,10 @@ class NESSinglePlayerEnv(gym.Env, EzPickle):
         """Return the native (240, 256) grayscale frame as a read-only view."""
         return np.frombuffer(self._env.screen_gray(), dtype=np.uint8).reshape((240, 256))
 
+    def get_screen_rgb(self) -> np.ndarray:
+        """Return the native (240, 256, 3) RGB frame as a read-only view."""
+        return np.frombuffer(self._env.screen_rgb(), dtype=np.uint8).reshape((240, 256, 3))
+
     def set_render_enabled(self, enabled: bool) -> None:
         self._env.set_render_enabled(enabled)
 
@@ -252,7 +264,11 @@ _MULTI_OBS_SHAPE = {"ram": (2048,), "rgb": (240, 256, 3), "grayscale": (240, 256
 class NESMultiPlayerEnv(ParallelEnv):
     """PettingZoo ParallelEnv facade for shared-screen NES multiplayer games."""
 
-    metadata = {"render_modes": ["rgb_array"], "name": "nesle_multiplayer_v0", "is_parallelizable": True}
+    metadata = {
+        "render_modes": ["rgb_array"],
+        "name": "nesle_multiplayer_v0",
+        "is_parallelizable": True,
+    }
 
     def __init__(
         self,
@@ -260,7 +276,7 @@ class NESMultiPlayerEnv(ParallelEnv):
         env_id: str = "NESLE/SuperC-2P-2-v0",
         rom_path: str | Path | None = None,
         obs_type: str = "rgb",
-        frameskip: int = 4,
+        frame_skip: int = 4,
         max_num_frames_per_episode: int | None = None,
         render_mode: str | None = None,
     ) -> None:
@@ -280,13 +296,15 @@ class NESMultiPlayerEnv(ParallelEnv):
         self._env = _nesle.NesEnv(game_id)
         self._env.set_start_state(start_state)
         self._env.load_rom_bytes(resolve_rom(game_id, rom_path).read_bytes())
-        self._env.set_action_repeat(frameskip, 0.0)
+        self._env.set_action_repeat(frame_skip, 0.0)
         self._env.set_max_episode_frames(max_num_frames_per_episode)
-        self._n = int(self._env.num_players())
-        self.possible_agents: list[str] = [f"player_{i}" for i in range(self._n)]
+        self.num_players = int(self._env.num_players())
+        self.possible_agents: list[str] = [f"player_{i}" for i in range(self.num_players)]
         self.agents: list[str] = []
         self._actions = self._env.minimal_action_set()
-        self._obs_space = spaces.Box(low=0, high=255, shape=_MULTI_OBS_SHAPE[obs_type], dtype=np.uint8)
+        self._obs_space = spaces.Box(
+            low=0, high=255, shape=_MULTI_OBS_SHAPE[obs_type], dtype=np.uint8
+        )
         self._act_space = spaces.Discrete(len(self._actions))
         self.observation_spaces = {a: self._obs_space for a in self.possible_agents}
         self.action_spaces = {a: self._act_space for a in self.possible_agents}
@@ -309,7 +327,7 @@ class NESMultiPlayerEnv(ParallelEnv):
         return observations, infos
 
     def step(self, actions: dict[str, int]):
-        masks = [0] * self._n
+        masks = [0] * self.num_players
         for i, agent in enumerate(self.possible_agents):
             if agent in self.agents:
                 masks[i] = self._multi_mask(actions[agent])
@@ -349,13 +367,28 @@ class NESMultiPlayerEnv(ParallelEnv):
     def _multi_screen_rgb(self) -> np.ndarray:
         return np.frombuffer(self._env.screen_rgb(), dtype=np.uint8).reshape((240, 256, 3))
 
+    def get_ram(self) -> np.ndarray:
+        """Full CPU RAM (2048,) of the shared console."""
+        return np.frombuffer(self._env.ram(), dtype=np.uint8).copy()
+
+    def get_nametable(self) -> np.ndarray:
+        """Full PPU nametable / CIRAM tile field of the shared console."""
+        return np.frombuffer(self._env.nametable(), dtype=np.uint8).copy()
+
+    def set_ram(self, ram) -> None:
+        """Overwrite the shared console's CPU RAM (2048,)."""
+        arr = np.asarray(ram, dtype=np.uint8)
+        if arr.shape != (2048,):
+            raise ValueError(f"RAM must have shape (2048,), got {arr.shape}")
+        self._env.set_ram(arr.tobytes())
+
 
 def parallel_env(
     *,
     env_id: str = "NESLE/SuperC-2P-2-v0",
     rom_path: str | Path | None = None,
     obs_type: str = "rgb",
-    frameskip: int = 4,
+    frame_skip: int = 4,
     max_num_frames_per_episode: int | None = None,
     render_mode: str | None = None,
 ) -> NESMultiPlayerEnv:
@@ -364,7 +397,7 @@ def parallel_env(
         env_id=env_id,
         rom_path=rom_path,
         obs_type=obs_type,
-        frameskip=frameskip,
+        frame_skip=frame_skip,
         max_num_frames_per_episode=max_num_frames_per_episode,
         render_mode=render_mode,
     )

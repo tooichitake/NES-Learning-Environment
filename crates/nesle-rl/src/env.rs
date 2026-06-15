@@ -307,10 +307,7 @@ impl NesEnv {
                 break;
             }
         }
-        if self.skip_transitions
-            && !terminated[..players].iter().all(|&t| t)
-            && !truncated
-        {
+        if self.skip_transitions && !terminated[..players].iter().all(|&t| t) && !truncated {
             let (t, tr) = self.skip_transition()?;
             if t {
                 for slot in terminated.iter_mut().take(players) {
@@ -353,11 +350,7 @@ impl NesEnv {
     /// path) it does NOT fast-forward level transitions. Shares `step_one_frame`
     /// with `step`; `step` itself never references a sink, so the RL/obs hot path
     /// is unchanged.
-    pub fn step_rendered(
-        &mut self,
-        masks: &[u8],
-        sink: &mut dyn FrameSink,
-    ) -> Result<StepOutcome> {
+    pub fn step_rendered(&mut self, masks: &[u8], sink: &mut dyn FrameSink) -> Result<StepOutcome> {
         let masks = self.sticky_actions(masks);
         let players = self.players as usize;
         let mut rewards = [0.0f32; 4];
@@ -584,8 +577,8 @@ impl NesEnv {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test_support::load_test_rom;
     use crate::games::GameSpec;
+    use crate::test_support::load_test_rom;
 
     fn test_rom() -> Vec<u8> {
         load_test_rom()

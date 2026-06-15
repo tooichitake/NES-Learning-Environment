@@ -26,7 +26,7 @@ from typing import Any
 import numpy as np
 from gymnasium import spaces
 from gymnasium.vector import AutoresetMode, VectorEnv
-from nesle.registration import resolve_env_id
+from nesle.registration import resolve_env_id, vector_profile_params
 from nesle.roms import resolve_rom
 
 from . import _nesle
@@ -42,7 +42,7 @@ class NESSinglePlayerVectorEnv(VectorEnv):
         rom_path: str | Path | None = None,
         obs_type: str = "rgb",
         preprocessed: bool = False,
-        frameskip: int = 1,
+        frame_skip: int = 1,
         frame_stack: int | None = None,
         repeat_action_probability: float = 0.0,
         full_action_space: bool = False,
@@ -53,18 +53,13 @@ class NESSinglePlayerVectorEnv(VectorEnv):
         screen_size: int | tuple[int, int] | None = None,
         noop_max: int = 0,
         terminal_on_life_loss: bool = False,
-        grayscale_newaxis: bool = False,
         remove_sprite_limit: bool = False,
-        render_skip: bool = True,
-        maxpool: bool = False,
+        max_pool: bool = False,
         clip_reward: bool = False,
         scale_obs: bool = False,
         batch_size: int = 0,
         num_threads: int = 0,
     ) -> None:
-        if grayscale_newaxis:
-            raise ValueError("Gymnasium vector env does not support grayscale_newaxis")
-        del render_skip
         self.num_envs = int(num_envs)
         self.game_id = game_id
         self._level_state = _level_state
@@ -91,7 +86,7 @@ class NESSinglePlayerVectorEnv(VectorEnv):
         if self._async and not self._preprocessed:
             raise ValueError("async vector env (batch_size < num_envs) requires preprocessed=True")
 
-        action_repeat = int(frameskip)
+        action_repeat = int(frame_skip)
         # Honor BOTH episode caps by taking the tighter one (both in NES-frame units).
         _caps = []
         if max_num_frames_per_episode is not None:
@@ -112,7 +107,7 @@ class NESSinglePlayerVectorEnv(VectorEnv):
                 num_threads,
                 action_repeat,
                 screen_size,
-                maxpool,
+                max_pool,
                 terminal_on_life_loss,
                 remove_sprite_limit,
                 repeat_action_probability,
@@ -130,7 +125,7 @@ class NESSinglePlayerVectorEnv(VectorEnv):
                 seed,
                 remove_sprite_limit,
                 screen_size,
-                maxpool,
+                max_pool,
                 terminal_on_life_loss,
             )
 
@@ -159,7 +154,7 @@ class NESSinglePlayerVectorEnv(VectorEnv):
         seed,
         remove_sprite_limit,
         screen_size,
-        maxpool,
+        max_pool,
         terminal_on_life_loss,
     ) -> tuple[int, ...]:
         obs_mode = "preprocessed" if self._preprocessed else self.obs_type
@@ -173,7 +168,7 @@ class NESSinglePlayerVectorEnv(VectorEnv):
             frame_skip=action_repeat,
             width=width,
             height=height,
-            maxpool=bool(maxpool),
+            maxpool=bool(max_pool),
             stack_num=self.frame_stack,
             terminal_on_life_loss=bool(terminal_on_life_loss),
             repeat_action_probability=float(repeat_action_probability),
@@ -192,7 +187,7 @@ class NESSinglePlayerVectorEnv(VectorEnv):
         num_threads,
         action_repeat,
         screen_size,
-        maxpool,
+        max_pool,
         terminal_on_life_loss,
         remove_sprite_limit,
         repeat_action_probability,
@@ -211,7 +206,7 @@ class NESSinglePlayerVectorEnv(VectorEnv):
             frame_skip=action_repeat,
             width=width,
             height=height,
-            maxpool=bool(maxpool),
+            maxpool=bool(max_pool),
             terminal_on_life_loss=bool(terminal_on_life_loss),
             repeat_action_probability=float(repeat_action_probability),
             noop_max=self._noop_max,
@@ -329,6 +324,14 @@ class NESSinglePlayerVectorEnv(VectorEnv):
         height, width = _screen_hw(screen_size)
         self.obs_type = "grayscale"
         return (height, width)
+
+    def get_ram(self) -> np.ndarray:
+        """Per-env CPU RAM ``(num_envs, 2048)`` -- live game state the preprocessed obs drops."""
+        return np.frombuffer(self._env.ram_batch(), dtype=np.uint8).reshape(self.num_envs, 2048)
+
+    def get_nametable(self) -> np.ndarray:
+        """Per-env PPU nametable / CIRAM tile field ``(num_envs, vram_len)``."""
+        return np.frombuffer(self._env.nametable_batch(), dtype=np.uint8).reshape(self.num_envs, -1)
 
     def _single_obs(self) -> np.ndarray:
         if self._preprocessed:
@@ -454,12 +457,12 @@ class NESMultiPlayerVectorEnv:
         self,
         *,
         env_id: str,
-        num_units: int,
+        num_envs: int,
         rom_path: str | Path | None = None,
         screen_size: int = 84,
         frame_stack: int = 4,
-        frameskip: int = 4,
-        maxpool: bool = False,
+        frame_skip: int = 4,
+        max_pool: bool = False,
         terminal_on_life_loss: bool = False,
         noop_max: int = 0,
         max_num_frames_per_episode: int | None = None,
@@ -471,31 +474,31 @@ class NESMultiPlayerVectorEnv:
         game_id, start_state = resolve_env_id(env_id)
         self.game_id = game_id
         self.env_id = env_id
-        self.num_units = int(num_units)
+        self.num_envs = int(num_envs)
         self.screen_size = int(screen_size)
         self.frame_stack = int(frame_stack)
 
         proto = _nesle.NesEnv(game_id)
-        self.players = int(proto.num_players())  # N ports = agents per match
-        self.num_agents = self.num_units * self.players
+        self.num_players = int(proto.num_players())  # N ports = agents per match
+        self.num_agents = self.num_envs * self.num_players
         self._actions = proto.minimal_action_set()
         self.num_actions = len(self._actions)
         self._masks = np.array([mask for _, mask in self._actions], dtype=np.uint8)
         # Fixed per-slot player index (slot u*N+p -> player p).
-        self.player_ids = np.tile(np.arange(self.players, dtype=np.int64), self.num_units)
+        self.player_ids = np.tile(np.arange(self.num_players, dtype=np.int64), self.num_envs)
 
         rom = resolve_rom(game_id, rom_path).read_bytes()
         # PREPROCESSED obs_mode: the Rust ObsPipeline does grayscale/resize/maxpool/stack per unit; Python fans it out K -> K*N.
         self._env = _nesle.NesVectorEnv(
-            self.num_units,
+            self.num_envs,
             game_id=game_id,
             rom=rom,
             obs_mode="preprocessed",
-            players=self.players,
-            frame_skip=int(frameskip),
+            players=self.num_players,
+            frame_skip=int(frame_skip),
             width=self.screen_size,
             height=self.screen_size,
-            maxpool=bool(maxpool),
+            maxpool=bool(max_pool),
             stack_num=self.frame_stack,
             terminal_on_life_loss=bool(terminal_on_life_loss),
             noop_max=int(noop_max),
@@ -514,21 +517,19 @@ class NESMultiPlayerVectorEnv:
     def obs_shape(self) -> tuple[int, int, int]:
         return (self.frame_stack, self.screen_size, self.screen_size)
 
-    def ram(self) -> np.ndarray:
-        """Per-unit CPU RAM ``(num_units, 2048)`` -- one shared NES RAM per match.
+    def get_ram(self) -> np.ndarray:
+        """Per-env CPU RAM ``(num_envs, 2048)`` -- one shared NES RAM per match.
         For reward-shaping / scripted opponents that read game state (player
         positions, alive flags, ...) which the preprocessed obs does not carry."""
-        return np.frombuffer(self._env.ram_batch(), dtype=np.uint8).reshape(
-            self.num_units, 2048
-        )
+        return np.frombuffer(self._env.ram_batch(), dtype=np.uint8).reshape(self.num_envs, 2048)
 
-    def nametable(self) -> np.ndarray:
-        """Per-unit PPU nametable / CIRAM ``(num_units, vram_len)`` -- the rendered
+    def get_nametable(self) -> np.ndarray:
+        """Per-env PPU nametable / CIRAM ``(num_envs, vram_len)`` -- the rendered
         field's tile ids (walls / soft bricks / floor / bombs / flames). The field
         is NOT a per-tile array in CPU RAM, so brick-clearing reward shaping and
         scripted bots read it from here."""
         flat = np.frombuffer(self._env.nametable_batch(), dtype=np.uint8)
-        return flat.reshape(self.num_units, -1)
+        return flat.reshape(self.num_envs, -1)
 
     def _stacked_obs(self) -> np.ndarray:
         """Per-slot frame-stacked obs. The Rust ObsPipeline already produced one
@@ -536,9 +537,9 @@ class NESMultiPlayerVectorEnv:
         Rust); fan it out K -> K*N so every co-located player sees its unit's stack."""
         h = w = self.screen_size
         units = np.frombuffer(self._env.observation_batch(), np.uint8).reshape(
-            self.num_units, self.frame_stack, h, w
+            self.num_envs, self.frame_stack, h, w
         )
-        return np.repeat(units, self.players, axis=0)
+        return np.repeat(units, self.num_players, axis=0)
 
     def reset(self):
         self._env.reset()
@@ -550,11 +551,11 @@ class NESMultiPlayerVectorEnv:
         self._env.send(masks.astype(np.uint8).tolist())  # flat unit-major
         ports = self._env.recv_ports()
 
-        n = self.players
+        n = self.num_players
         rewards = np.zeros(self.num_agents, np.float32)
         # `done` = per-agent episode end (spectator-masked): a dead player ends once, then spectates (reward 0) until the unit resets.
         done = np.zeros(self.num_agents, bool)
-        unit_done = np.zeros(self.num_units, bool)
+        unit_done = np.zeros(self.num_envs, bool)
         for env_id, rew4, term4, trunc, _frame, _ep_frame, _lives4, final_obs in ports:
             base = env_id * n
             unit_done[env_id] = final_obs
@@ -584,9 +585,9 @@ class NESMultiPlayerVectorEnv:
             del self._env
 
 
-def make_selfplay_vector_env(
+def make_multiplayer_vector_env(
     env_id: str,
-    num_units: int,
+    num_envs: int,
     *,
     frame_stack: int = 4,
     max_episode_steps: int | None = None,
@@ -594,13 +595,14 @@ def make_selfplay_vector_env(
     num_threads: int = 0,
     **overrides: Any,
 ) -> NESMultiPlayerVectorEnv:
-    """Build a self-play ``NESMultiPlayerVectorEnv`` with the env-id's ``-vN`` profile
-    auto-applied -- the multi-player analog of ``gym.make_vec`` for single-agent.
+    """Build a ``NESMultiPlayerVectorEnv`` with the env-id's ``-vN`` profile auto-applied
+    -- the multi-player analog of ``gym.make_vec`` (the class is not gym-registered, so it
+    gets an explicit factory instead of going through the gym registry).
 
     ``NESMultiPlayerVectorEnv`` is profile-dumb (explicit preprocessing kwargs, like
     ``NESSinglePlayerVectorEnv``); this factory is the profile-applying layer: it reads
     ``registration.vector_profile_params`` (the ``_PROFILE_PARAMS`` source of truth)
-    from the ``-v1/-v2/-v3`` suffix and passes screen_size / frameskip / maxpool /
+    from the ``-v1/-v2/-v3`` suffix and passes screen_size / frame_skip / max_pool /
     noop_max / sticky to the env, so the trainer just names ``...-v3`` instead of
     hand-setting the profile. ``terminal_on_life_loss`` is forced ``False``: in
     last-standing multi-player (Bomberman) death is handled by the game's
@@ -609,18 +611,16 @@ def make_selfplay_vector_env(
     ``max_episode_steps`` are training knobs (not part of the obs profile); any
     keyword in ``overrides`` wins over the profile.
     """
-    from nesle.registration import vector_profile_params
-
     params = vector_profile_params(env_id)
-    frameskip = int(params["frameskip"])
-    max_frames = max_episode_steps * frameskip if max_episode_steps else None
+    frame_skip = int(params["frame_skip"])
+    max_frames = max_episode_steps * frame_skip if max_episode_steps else None
     kwargs: dict[str, Any] = dict(
         env_id=env_id,
-        num_units=num_units,
+        num_envs=num_envs,
         screen_size=int(params["screen_size"]),
         frame_stack=frame_stack,
-        frameskip=frameskip,
-        maxpool=bool(params["maxpool"]),
+        frame_skip=frame_skip,
+        max_pool=bool(params["max_pool"]),
         noop_max=int(params["noop_max"]),
         repeat_action_probability=float(params["repeat_action_probability"]),
         terminal_on_life_loss=False,

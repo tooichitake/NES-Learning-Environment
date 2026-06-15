@@ -134,12 +134,7 @@ impl Mapper for MapperImpl {
         dispatch_mapper!(& self => |m| m.cpu_code_read(addr))
     }
 
-    fn cpu_read_open_bus(
-        &mut self,
-        addr: u16,
-        open_bus: u8,
-        interrupt: &mut InterruptLines,
-    ) -> u8 {
+    fn cpu_read_open_bus(&mut self, addr: u16, open_bus: u8, interrupt: &mut InterruptLines) -> u8 {
         dispatch_mapper!(&mut self => |m| m.cpu_read_open_bus(addr, open_bus, interrupt))
     }
 
@@ -168,12 +163,7 @@ impl Mapper for MapperImpl {
         dispatch_mapper!(&mut self => |m| m.ppu_read_nametable(addr, ciram, interrupt))
     }
 
-    fn ppu_write_nametable(
-        &mut self,
-        addr: u16,
-        value: u8,
-        ciram: &mut [u8; 0x1000],
-    ) -> bool {
+    fn ppu_write_nametable(&mut self, addr: u16, value: u8, ciram: &mut [u8; 0x1000]) -> bool {
         dispatch_mapper!(&mut self => |m| m.ppu_write_nametable(addr, value, ciram))
     }
 

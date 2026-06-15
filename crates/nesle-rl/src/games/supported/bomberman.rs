@@ -23,7 +23,8 @@ pub static BOMBERMAN: GameSpec = GameSpec {
     terminal: bomberman_terminal,
     lives: bomberman_lives,
     in_transition: None,
-    per_agent_lives_termination: false,};
+    per_agent_lives_termination: false,
+};
 
 pub const BOMBERMAN_ACTIONS: [NesAction; 12] = [
     NesAction::new("NOOP", 0),

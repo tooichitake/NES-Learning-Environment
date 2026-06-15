@@ -117,10 +117,15 @@ struct WorkerEnv {
 }
 
 enum Task {
-    Reset { env_id: usize },
+    Reset {
+        env_id: usize,
+    },
     /// One agent step for unit `env_id`. `masks[i]` is port i's action mask;
     /// trailing ports (>= the unit's `players`) are zero and ignored by the env.
-    Step { env_id: usize, masks: [u8; 4] },
+    Step {
+        env_id: usize,
+        masks: [u8; 4],
+    },
 }
 
 /// A finished env step (or reset), ready for the consumer. `obs` is the inline
@@ -787,9 +792,9 @@ impl NesVectorEnv {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test_support::load_test_rom;
     use crate::games::{GameSpec, Ram};
     use crate::preprocess::RenderPolicy;
+    use crate::test_support::load_test_rom;
 
     fn zero_reward(_p: &Ram, _c: &Ram) -> MultiPlayerValues<f32> {
         [0.0; 4]

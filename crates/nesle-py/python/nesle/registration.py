@@ -10,6 +10,7 @@ from dataclasses import dataclass
 from typing import Any
 
 import gymnasium as gym
+from nesle.roms import game_metadata, start_state_metadata
 
 from . import _nesle
 
@@ -17,11 +18,10 @@ _EPISODE_FRAME_CAP = 108_000
 
 _RAW_PARAMS: dict[str, Any] = {
     "obs_type": "rgb",
-    "frameskip": 1,
+    "frame_skip": 1,
     "screen_size": None,
-    "maxpool": False,
+    "max_pool": False,
     "remove_sprite_limit": False,
-    "render_skip": False,
     "noop_max": 0,
     "terminal_on_life_loss": False,
     "repeat_action_probability": 0.0,
@@ -31,11 +31,10 @@ _RAW_PARAMS: dict[str, Any] = {
 
 _STANDARD_PARAMS: dict[str, Any] = {
     "preprocessed": True,
-    "frameskip": 4,
+    "frame_skip": 4,
     "screen_size": 112,  # NES native 256x240 is ~1.83x Atari's pixels; 112 = 84*4/3 matches ALE detail-retention
-    "maxpool": True,
+    "max_pool": True,
     "remove_sprite_limit": False,
-    "render_skip": True,
     "noop_max": 30,
     "terminal_on_life_loss": True,
     "repeat_action_probability": 0.0,
@@ -45,7 +44,7 @@ _STANDARD_PARAMS: dict[str, Any] = {
 
 _NOFLICKER_PARAMS: dict[str, Any] = {
     **_STANDARD_PARAMS,
-    "maxpool": False,
+    "max_pool": False,
     "remove_sprite_limit": True,
 }
 
@@ -59,9 +58,9 @@ _PROFILE_PARAMS: dict[str, dict[str, Any]] = {
     "-v1": _STANDARD_PARAMS,
     "-v2": _NOFLICKER_PARAMS,
     "-v3": _STICKY_PARAMS,
-    "NoFrameskip-v1": {**_STANDARD_PARAMS, "frameskip": 1},
-    "NoFrameskip-v2": {**_NOFLICKER_PARAMS, "frameskip": 1},
-    "NoFrameskip-v3": {**_STICKY_PARAMS, "frameskip": 1},
+    "NoFrameskip-v1": {**_STANDARD_PARAMS, "frame_skip": 1},
+    "NoFrameskip-v2": {**_NOFLICKER_PARAMS, "frame_skip": 1},
+    "NoFrameskip-v3": {**_STICKY_PARAMS, "frame_skip": 1},
 }
 
 
@@ -69,8 +68,8 @@ def vector_profile_params(env_id: str) -> dict[str, Any]:
     """Preprocessing params for a *vectorized* env-id, keyed by its ``-vN`` suffix.
 
     The single source of truth (``_PROFILE_PARAMS``), shared by single-agent
-    ``gym.make_vec`` (via registration) and multi-player self-play (via
-    ``vector_env.make_selfplay_vector_env``). ``-v0`` is the RAW profile and is not
+    ``gym.make_vec`` (via registration) and multi-player vectorization (via
+    ``vector_env.make_multiplayer_vector_env``). ``-v0`` is the RAW profile and is not
     a vectorized/preprocessed profile, so it raises here. ``screen_size`` defaults
     to 84 when the profile leaves it unset.
     """
@@ -102,7 +101,7 @@ class ParsedEnvId:
     game_mode: str | None  # game-mode layer (e.g. "2P"/"1P"/"VS"/"Normal"); None if modeless
     game_level: str  # game-level layer: start-state suffix (e.g. "2", "1-1")
     env_version: int  # env-version layer (0..3)
-    no_frameskip: bool  # the NoFrameskip env-version variant (frameskip=1)
+    no_frameskip: bool  # the NoFrameskip env-version variant (frame_skip=1)
     state_id: str  # formal start-state id backing game_level
 
 
@@ -116,8 +115,6 @@ def _iter_env_ids():
     (game names are hyphen-free, so the mode is whatever follows the first hyphen);
     game-level is the start-state suffix, which may itself contain hyphens (SMB 1-1).
     """
-    from nesle.roms import game_metadata, start_state_metadata
-
     states = start_state_metadata()
     for game_id, meta in game_metadata().items():
         families: list[tuple[str, bool]] = []  # (stem, single_agent_family)
@@ -203,14 +200,12 @@ def _preprocessed_kwargs(game_id: str, level_state: str, params: dict[str, Any])
         "_level_state": level_state,
         "preprocessed": params["preprocessed"],
         "screen_size": params["screen_size"],
-        "frameskip": params["frameskip"],
+        "frame_skip": params["frame_skip"],
         "noop_max": params["noop_max"],
         "terminal_on_life_loss": params["terminal_on_life_loss"],
-        "grayscale_newaxis": False,
         "scale_obs": params["scale_obs"],
-        "maxpool": params["maxpool"],
+        "max_pool": params["max_pool"],
         "remove_sprite_limit": params["remove_sprite_limit"],
-        "render_skip": params["render_skip"],
         "clip_reward": params["clip_reward"],
         "repeat_action_probability": params["repeat_action_probability"],
         "max_num_frames_per_episode": _EPISODE_FRAME_CAP,
@@ -232,7 +227,7 @@ def _register_single_agent_family(game_id: str, base: str, states: dict) -> None
                 "game_id": game_id,
                 "_level_state": level_state,
                 "obs_type": raw["obs_type"],
-                "frameskip": raw["frameskip"],
+                "frame_skip": raw["frame_skip"],
                 "repeat_action_probability": raw["repeat_action_probability"],
                 "max_num_frames_per_episode": _EPISODE_FRAME_CAP,
             },
@@ -246,8 +241,6 @@ def _register_single_agent_family(game_id: str, base: str, states: dict) -> None
 
 
 def register_envs() -> None:
-    from nesle.roms import game_metadata, start_state_metadata
-
     states = start_state_metadata()
     for game_id, meta in game_metadata().items():
         if meta.get("players") == 1:

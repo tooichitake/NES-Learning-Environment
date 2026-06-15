@@ -233,7 +233,13 @@ mod tests {
                 break;
             }
         }
-        assert!(reached_next, "must fast-forward straight into the next level");
-        assert!(!saw_dead_zone, "agent must never observe a cutscene/load state");
+        assert!(
+            reached_next,
+            "must fast-forward straight into the next level"
+        );
+        assert!(
+            !saw_dead_zone,
+            "agent must never observe a cutscene/load state"
+        );
     }
 }

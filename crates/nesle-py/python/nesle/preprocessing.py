@@ -7,7 +7,6 @@ from typing import Any
 import gymnasium as gym
 import numpy as np
 from gymnasium.spaces import Box
-
 from nesle.env import NESSinglePlayerEnv
 
 ScreenSize = int | tuple[int, int]
@@ -22,7 +21,9 @@ def _screen_size_shape(screen_size: ScreenSize) -> tuple[int, int]:
         and all(isinstance(size, int) and size > 0 for size in screen_size)
     ):
         return screen_size
-    raise AssertionError(f"screen_size must be a positive int or (width, height), got {screen_size!r}")
+    raise AssertionError(
+        f"screen_size must be a positive int or (width, height), got {screen_size!r}"
+    )
 
 
 class NESPreprocessing(gym.Wrapper):
@@ -38,21 +39,23 @@ class NESPreprocessing(gym.Wrapper):
         terminal_on_life_loss: bool = False,
         grayscale_newaxis: bool = False,
         scale_obs: bool = False,
-        maxpool: bool = True,
+        max_pool: bool = True,
         render_skip: bool = True,
     ) -> None:
         super().__init__(env)
         assert frame_skip > 0
         width, height = _screen_size_shape(screen_size)
-        if frame_skip > 1 and getattr(env.unwrapped, "frameskip", None) != 1:
+        if frame_skip > 1 and getattr(env.unwrapped, "frame_skip", None) != 1:
             raise ValueError(
-                "base env must have frameskip=1; NESPreprocessing performs the frame-skip itself"
+                "base env must have frame_skip=1; NESPreprocessing performs the frame-skip itself"
             )
         assert noop_max >= 0
         if noop_max > 0:
             assert env.unwrapped.get_action_meanings()[0] == "NOOP"
         if not hasattr(env.unwrapped, "get_screen_grayscale"):
-            raise TypeError("NESPreprocessing requires a NESSinglePlayerEnv-style env with get_screen_grayscale()")
+            raise TypeError(
+                "NESPreprocessing requires a NESSinglePlayerEnv-style env with get_screen_grayscale()"
+            )
 
         self.noop_max = noop_max
         self.frame_skip = frame_skip
@@ -60,13 +63,13 @@ class NESPreprocessing(gym.Wrapper):
         self.terminal_on_life_loss = terminal_on_life_loss
         self.grayscale_newaxis = grayscale_newaxis
         self.scale_obs = scale_obs
-        self.maxpool = maxpool
+        self.max_pool = max_pool
         self.render_skip = render_skip
 
         self.lives = 0
         self.game_over = False
         env.unwrapped._env.configure_obs_shape(
-            frame_skip, width, height, maxpool, render_skip, terminal_on_life_loss
+            frame_skip, width, height, max_pool, render_skip, terminal_on_life_loss
         )
 
         _low, _high, _dtype = (0, 1, np.float32) if scale_obs else (0, 255, np.uint8)
@@ -121,7 +124,7 @@ def _make_preprocessed_env(
     game_id: str,
     preprocessed: bool = True,
     screen_size: ScreenSize = 84,
-    frameskip: int = 4,
+    frame_skip: int = 4,
     noop_max: int = 30,
     terminal_on_life_loss: bool = False,
     grayscale_newaxis: bool = False,
@@ -129,7 +132,7 @@ def _make_preprocessed_env(
     remove_sprite_limit: bool = False,
     render_skip: bool = True,
     clip_reward: bool = False,
-    maxpool: bool = True,
+    max_pool: bool = True,
     repeat_action_probability: float = 0.0,
     full_action_space: bool = False,
     max_num_frames_per_episode: int | None = 108_000,
@@ -140,11 +143,13 @@ def _make_preprocessed_env(
     mirroring gymnasium.AtariPreprocessing). ``preprocessed`` is the shared env-spec
     flag the vector entry point reads; it must be True on this (preprocessed) path."""
     if not preprocessed:
-        raise ValueError("_make_preprocessed_env builds the preprocessed pipeline; preprocessed must be True")
+        raise ValueError(
+            "_make_preprocessed_env builds the preprocessed pipeline; preprocessed must be True"
+        )
     env: gym.Env = NESSinglePlayerEnv(
         game_id=game_id,
         obs_type="ram",
-        frameskip=1,
+        frame_skip=1,
         repeat_action_probability=repeat_action_probability,
         full_action_space=full_action_space,
         remove_sprite_limit=remove_sprite_limit,
@@ -155,12 +160,12 @@ def _make_preprocessed_env(
     env = NESPreprocessing(
         env,
         noop_max=noop_max,
-        frame_skip=frameskip,
+        frame_skip=frame_skip,
         screen_size=screen_size,
         terminal_on_life_loss=terminal_on_life_loss,
         grayscale_newaxis=grayscale_newaxis,
         scale_obs=scale_obs,
-        maxpool=maxpool,
+        max_pool=max_pool,
         render_skip=render_skip,
     )
     if clip_reward:
