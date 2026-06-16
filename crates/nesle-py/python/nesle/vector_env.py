@@ -1,6 +1,6 @@
 """Gymnasium VectorEnv facade for the Rust-native NESLE vector path.
 
-One class, ale-py style (mirrors ``ale_py.vector_env.AtariVectorEnv``): ONE Rust
+One class: ONE Rust
 worker-pool engine, and ``batch_size`` selects the consumption discipline.
 
 * ``batch_size`` in ``{0, num_envs}`` -> synchronous full batch: ``reset``/``step``
@@ -11,7 +11,7 @@ worker-pool engine, and ``batch_size`` selects the consumption discipline.
   ``batch_size`` envs to finish, tagged via ``info["env_id"]`` (out-of-order, GIL
   released). ``reset``/``step`` are unavailable in this mode.
 
-Frame stacking (ale-py ``stack_num``) is built in for both modes: preprocessed
+Frame stacking (``stack_num``) is built in for both modes: preprocessed
 (grayscale) observations default to ``frame_stack=4`` so ``make_vec`` hands back a
 ready-to-train ``(num_envs, frame_stack, H, W)`` tensor, exactly like
 ``FrameStackObservation + AtariPreprocessing``. Raw obs (rgb/ram) default to no
@@ -74,7 +74,7 @@ class NESSinglePlayerVectorEnv(VectorEnv):
         self._autoreset = autoreset
         self.metadata = {"render_modes": [], "autoreset_mode": autoreset}
 
-        # ale-py stack_num: preprocessed envs default to a 4-frame stack; raw obs to none.
+        # stack_num: preprocessed envs default to a 4-frame stack; raw obs to none.
         if frame_stack is None:
             frame_stack = 4 if self._preprocessed else 1
         self.frame_stack = int(frame_stack)
@@ -446,8 +446,7 @@ class NESMultiPlayerVectorEnv:
     """Multi-player vectorized env (the multi sibling of NESSinglePlayerVectorEnv).
 
     Naming follows the regular ``NES[MultiPlayer][Vector]Env`` scheme — single-agent
-    is the unmarked default (``NESSinglePlayerEnv`` / ``NESSinglePlayerVectorEnv``, like gym.Env / ale-py's
-    AtariEnv); only the multi-player variants carry ``MultiPlayer``. Unlike the other
+    is the unmarked default (``NESSinglePlayerEnv`` / ``NESSinglePlayerVectorEnv``, like gym.Env); only the multi-player variants carry ``MultiPlayer``. Unlike the other
     three it has NO standard base class: there is no community-standard multi-agent
     *vectorized* base (Gymnasium ``VectorEnv`` is single-agent, PettingZoo
     ``ParallelEnv`` is non-vectorized), so this is a deliberate custom API. It is

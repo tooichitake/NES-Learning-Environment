@@ -99,7 +99,7 @@ impl ObsKind {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ObsShape {
-    /// Stacked frames (ale-py `stack_num`; `1` = no stacking). The full observation
+    /// Stacked frames (`stack_num`; `1` = no stacking). The full observation
     /// is `stack` consecutive `width*height*channels` frames, oldest -> newest.
     pub stack: usize,
     pub width: usize,
@@ -167,7 +167,7 @@ pub struct ObsConfig {
     pub repeat_action_probability: f32,
     pub noop_max: usize,
     pub reward_clip: RewardClip,
-    /// ale-py `stack_num`: the observation is this many consecutive preprocessed
+    /// `stack_num`: the observation is this many consecutive preprocessed
     /// frames (oldest -> newest). `1` (default) = no stacking — the window serves a
     /// single frame, byte-identical to the pre-stacking pipeline.
     pub stack_num: usize,
@@ -216,7 +216,7 @@ impl ObsConfig {
         self
     }
 
-    /// Set the ale-py frame-stack depth (`1` = no stacking). Clamped to `>= 1`.
+    /// Set the frame-stack depth (`1` = no stacking). Clamped to `>= 1`.
     pub fn with_stack_num(mut self, stack_num: usize) -> Self {
         self.stack_num = stack_num.max(1);
         self

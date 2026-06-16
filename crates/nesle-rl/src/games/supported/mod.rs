@@ -1,4 +1,4 @@
-//! Per-game `GameSpec` definitions (ale-py `games/supported/` analog).
+//! Per-game `GameSpec` definitions.
 
 pub mod adventure_island;
 pub mod bomberman;

@@ -1,4 +1,4 @@
-//! Vectorized environment — ONE worker-pool engine (ale-py `ALEVectorInterface` style).
+//! Vectorized environment — ONE worker-pool engine.
 //!
 //! A pool of worker threads each pulls a `(env_id, action)` task from a lock-free
 //! MPMC action queue, steps THAT env (each env is touched by one worker at a time —

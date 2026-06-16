@@ -614,8 +614,7 @@ impl NesCore {
         &self.rgb_frame
     }
 
-    /// Per-pixel Rec.601 luminance of the displayed frame, matching ALE-py's
-    /// `getScreenGrayscale` (`round(0.299R + 0.587G + 0.114B)`). Derived from the
+    /// Per-pixel Rec.601 luminance of the displayed frame (`round(0.299R + 0.587G + 0.114B)`). Derived from the
     /// SAME 512-entry palette as `rgb_frame` (colour emphasis included), so it
     /// equals the luma of `rgb_frame` pixel-for-pixel and cannot drift. Single
     /// channel, built directly from the `u16` colour buffer (no RGB round-trip).
@@ -764,9 +763,8 @@ fn rgb_from_color_into(
     }
 }
 
-/// Rec.601 luma LUT for the 512-entry calculated palette, matching ALE-py's
-/// `getScreenGrayscale`: `round(0.299R + 0.587G + 0.114B)` with round-half-to-even
-/// (verified bit-exact vs ale-py 0.11.2 over a full frame). Built from the same
+/// Rec.601 luma LUT for the 512-entry calculated palette: `round(0.299R + 0.587G + 0.114B)` with round-half-to-even
+/// (verified bit-exact against a reference implementation over a full frame). Built from the same
 /// `build_calculated_palette` output so `grayscale_frame` == luma(`rgb_frame`)
 /// for every pixel, colour-emphasis combinations included.
 fn build_calculated_luma(palette: &[[u8; 3]; 512]) -> Box<[u8; 512]> {
@@ -852,7 +850,7 @@ mod tests {
 
     #[test]
     fn calculated_luma_is_rec601_luminance_not_palette_index() {
-        // The grayscale obs must be Rec.601 luminance (ale-py's getScreenGrayscale,
+        // The grayscale obs must be Rec.601 luminance (the standard getScreenGrayscale,
         // round(0.299R + 0.587G + 0.114B)), NOT the palette index scaled to 0..255.
         let pal = build_calculated_palette();
         let luma = build_calculated_luma(&pal);

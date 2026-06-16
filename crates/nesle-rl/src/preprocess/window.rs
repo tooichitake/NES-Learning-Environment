@@ -99,7 +99,7 @@ pub struct ObsWindow {
     have_rgb: bool,
     have_ram: bool,
     obs: Vec<u8>,
-    /// ale-py frame stack (oldest -> newest), `stack_num * obs.len()` bytes. Only
+    /// frame stack (oldest -> newest), `stack_num * obs.len()` bytes. Only
     /// maintained when `cfg.stack_num > 1`; for `stack_num == 1` the window serves
     /// `obs` directly (zero stacking overhead, byte-identical to the old pipeline).
     stack: Vec<u8>,
@@ -181,7 +181,7 @@ impl ObsWindow {
     pub fn refresh(&mut self, sample: FrameSample<'_>) -> Result<ObsWindowStep> {
         self.capture_frame(&sample)?;
         self.compute_current_obs()?;
-        // ale-py reset padding: prime every stack slot with this first frame.
+        // reset padding: prime every stack slot with this first frame.
         self.fill_stack();
         self.win_idx = 0;
         self.win_reward = [0.0; 4];
@@ -377,7 +377,7 @@ impl ObsWindow {
     }
 
     /// Prime every stack slot with the current single frame (`obs`). Used at reset:
-    /// ale-py pads the stack with copies of the first frame so the very first
+    /// The stack is padded with copies of the first frame so the very first
     /// observation already has `stack_num` frames. No-op when `stack_num <= 1`.
     fn fill_stack(&mut self) {
         let n = self.cfg.stack_num.max(1);

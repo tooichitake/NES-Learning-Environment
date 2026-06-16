@@ -61,8 +61,7 @@ pub struct StepOutcome {
     pub info: StepInfo,
 }
 
-/// One NES environment driving 1..=`players` controller ports (ale-py's
-/// `ALEInterface`-for-1-N model: single-player is the `players == 1` case).
+/// One NES environment driving 1..=`players` controller ports (single-player is the `players == 1` case).
 /// `step(masks)` takes one action mask per active port; `rewards`/`lives`/
 /// `terminated` are per-port `[_; 4]` (trailing slots zero / true). Single-player
 /// passes a 1-element slice and reads index 0 -- byte-for-byte identical to the

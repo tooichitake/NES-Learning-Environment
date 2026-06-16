@@ -5,7 +5,7 @@ build-backend = "maturin"
 [project]
 name = "nesle"
 version = "0.1.0"
-description = "Linux-first Rust-native NES reinforcement-learning environment."
+description = "Rust-native NES reinforcement-learning environment (Gymnasium + PettingZoo)."
 readme = "README.md"
 requires-python = ">=3.10"
 license = "GPL-2.0-only"
@@ -31,28 +31,14 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-render = []
-mario = [
-    "stable-baselines3>=2.0.0",
-    "torch>=2.0.0",
-    "opencv-python-headless>=4.5",
-    "tensorboard>=2.9",
-    "imageio>=2.5",
-    "pandas>=1.5",
-    "optuna>=3.5",
-    "websockets>=12.0",
-    "tqdm",
-    "rich",
-]
-test = [
-    "pytest>=7.0",
-    "gymnasium>=1.0.0",
-    "numpy>=1.20",
-    "pettingzoo>=1.24",
-]
+# Multi-agent (PettingZoo ParallelEnv) envs.
+multiagent = ["pettingzoo>=1.24"]
+# Connect to a running nesle-server as an RL agent peer (nesle.agent_client).
+agent = ["websockets>=12.0"]
+test = ["pytest>=7.0", "pettingzoo>=1.24"]
 
 [project.urls]
-homepage = "https://github.com/tooichitake/gymnasium-mario"
+homepage = "https://github.com/tooichitake/nesle"
 
 [tool.maturin]
 manifest-path = "crates/nesle-py/Cargo.toml"
@@ -63,14 +49,6 @@ include = [
     "crates/nesle-py/python/nesle/roms/**/*.json",
 ]
 features = ["pyo3/extension-module"]
-
-[tool.pytest.ini_options]
-minversion = "7.0"
-addopts = "-ra -q -s --ignore build"
-testpaths = ["scripts"]
-python_files = ["test.py"]
-python_classes = ["*Tests"]
-norecursedirs = ["build", "target"]
 
 [tool.black]
 line-length = 100

@@ -19,20 +19,20 @@ pub type LivesFn = fn(current_ram: &Ram) -> MultiPlayerValues<u8>;
 /// `None` = the game has no such transition.
 pub type TransitionFn = fn(current_ram: &Ram) -> bool;
 
-/// One game, or one mode of a game. ale-py-style: a single spec drives 1..=`players`
+/// One game, or one mode of a game: a single spec drives 1..=`players`
 /// controller ports -- single-player is the `players == 1` case. Modes are separate
 /// specs sharing one `display_name`, told apart by `mode`: scoring modes (Bomberman II
 /// Normal / VS / Battle) and player-count modes (Super C / Ice Hockey 1P vs 2P, which
 /// the cart bakes into RAM at the menu, so a 2P save state can't be narrowed to 1P).
 ///
-/// Fields map onto ale-py's C++ `RomSettings` (`games/RomSettings.hpp`):
-/// `reward` = `getReward`, `terminal` = `isTerminal`, `lives` = `lives` (per-port here),
-/// `minimal_actions` = `getMinimalActionSet`, `mode` = `getAvailableModes`/`setMode`
-/// (NESLE models modes as separate specs, not a runtime switch), `sha1` = `md5`
-/// (SHA1 for the NES ROM ecosystem), `id`/`gym_id`/`display_name` ~ `rom()`. NESLE-only
-/// (no RomSettings analog): `in_transition` (cutscene fast-forward), `players` /
-/// `four_score` / `per_agent_lives_termination` (multiplayer), `family` (start-state
-/// folder grouping). Reset is a cached save-state, not ALE's scripted `getStartingActions`.
+/// Each field defines one aspect of a game's RL contract:
+/// `reward` (per-step reward), `terminal` (episode-over predicate), `lives` (per-port),
+/// `minimal_actions` (the game's action set), `mode` (scoring / player-count mode;
+/// NESLE models modes as separate specs, not a runtime switch), `sha1` (ROM identity),
+/// `id`/`gym_id`/`display_name` (naming). Multiplayer: `players` / `four_score` /
+/// `per_agent_lives_termination`. `in_transition` (cutscene fast-forward) and `family`
+/// (start-state folder grouping) are extras. Reset is a cached save-state, not a
+/// scripted action sequence.
 #[derive(Debug, Clone, Copy)]
 pub struct GameSpec {
     pub id: &'static str,

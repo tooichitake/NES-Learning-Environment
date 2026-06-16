@@ -146,7 +146,7 @@ vec = gym.make_vec("NESLE/SuperMarioBros-1-1-v3", num_envs=8)
 batch_obs, infos = vec.reset()                       # (8, 4, 112, 112)
 
 # Asynchronous (envpool-style): 0 < batch_size < num_envs.
-avec = gym.make_vec("NESLE/SuperMarioBros-1-1-v3", num_envs=12, batch_size=4)
+avec = gym.make_vec("NESLE/SuperMarioBros-1-1-v3", num_envs=16, batch_size=4)
 avec.async_reset()
 obs, rewards, terms, truncs, info = avec.recv()      # info["env_id"] demuxes
 avec.send(actions)                                   # one action per env in the recv batch
@@ -285,7 +285,61 @@ cargo run -p nesle-server --features audio-synth   # with APU audio
 Pick a game + level in the UI and the server **auto-loads** that game's packaged
 ROM by SHA-1 (no upload); **Upload ROM** handles unregistered ROMs.
 
+## Citing
+
+If you use NESLE in your research, please cite it:
+
+```bibtex
+@software{zhao_nesle,
+  author = {Zhao, Zhiyuan},
+  title  = {NESLE: The NES Learning Environment},
+  url    = {https://github.com/tooichitake/nesle},
+  year   = {2026},
+}
+```
+
+NESLE mirrors the Arcade Learning Environment's conventions. If you use the
+sticky-action profiles (`v3`, `repeat_action_probability = 0.25`), please also cite
+the ALE papers:
+
+```bibtex
+@article{bellemare13arcade,
+  author  = {{Bellemare}, M.~G. and {Naddaf}, Y. and {Veness}, J. and {Bowling}, M.},
+  title   = {The Arcade Learning Environment: An Evaluation Platform for General Agents},
+  journal = {Journal of Artificial Intelligence Research},
+  volume  = {47},
+  pages   = {253--279},
+  year    = {2013},
+}
+
+@article{machado18arcade,
+  author  = {Marlos C. Machado and Marc G. Bellemare and Erik Talvitie and Joel Veness and Matthew J. Hausknecht and Michael Bowling},
+  title   = {Revisiting the Arcade Learning Environment: Evaluation Protocols and Open Problems for General Agents},
+  journal = {Journal of Artificial Intelligence Research},
+  volume  = {61},
+  pages   = {523--562},
+  year    = {2018},
+}
+```
+
+## Acknowledgments
+
+NESLE is an original implementation; it mirrors conventions from, and is verified
+against, prior work:
+
+- **[Gymnasium](https://github.com/Farama-Foundation/Gymnasium)** /
+  **[PettingZoo](https://github.com/Farama-Foundation/PettingZoo)** (Farama Foundation) —
+  the single- and multi-agent interfaces NESLE implements.
+- **Arcade Learning Environment** (Bellemare et al. 2013; Machado et al. 2018) — the
+  observation / preprocessing / sticky-action conventions NESLE follows.
+- **gym-super-mario-bros / nes-py** (Christian Kauten) — single-agent NES reward conventions.
+- **[Mesen2](https://github.com/SourMesen/Mesen2)** — the reference emulator NESLE's core
+  is cycle-verified against (RAM + framebuffer).
+
 ## License
 
-[GPL-2.0-only](LICENSE). This license covers the source in this repository; it
-grants no rights to NES ROMs, which belong to their respective copyright holders.
+Copyright (C) 2026 Zhiyuan Zhao.
+
+NESLE is licensed under [GPL-2.0-only](LICENSE). This license covers the source in
+this repository; it grants no rights to NES ROMs, which belong to their respective
+copyright holders.

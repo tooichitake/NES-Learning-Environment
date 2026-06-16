@@ -306,7 +306,7 @@ mod tests {
 
     #[test]
     fn stack_pads_on_reset_and_rolls_newest_last() {
-        // ale-py frame stacking: reset pads every slot, then each step rolls the newest frame in last.
+        // frame stacking: reset pads every slot, then each step rolls the newest frame in last.
         let cfg = ObsConfig::gray(1, 8, false, RenderPolicy::HumanVisible, false).with_stack_num(3);
         let frame_len = 8 * 8;
         let mut window = ObsWindow::new(cfg);

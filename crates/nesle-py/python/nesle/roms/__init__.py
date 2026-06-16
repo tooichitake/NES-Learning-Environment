@@ -1,7 +1,7 @@
-"""ROM access for the Rust-native NESLE package (ale-py ``roms/`` package analog).
+"""ROM access for the Rust-native NESLE package.
 
 Holds ROM-file resolution + the packaged ``*.nes`` ROMs (this directory). env-id
-construction/resolution lives in ``nesle.registration`` (ale-py keeps that split).
+construction/resolution lives in ``nesle.registration``.
 """
 
 from __future__ import annotations
@@ -31,7 +31,7 @@ def game_metadata() -> dict[str, dict[str, object]]:
 
 
 def get_all_game_ids() -> list[str]:
-    """All registered game-ids (ale-py ``roms.get_all_rom_ids`` analog). NESLE keys
+    """All registered game-ids. NESLE keys
     games by the Rust ``GameSpec.id`` (e.g. ``super_c_2p``), not the ROM filename."""
     return sorted(game_metadata())
 
@@ -48,12 +48,12 @@ def roms_dir() -> Path:
 
 
 def _packaged_roms_dir() -> Path:
-    """Directory of ROMs shipped inside the wheel (this package dir, ale-py ``roms/`` style)."""
+    """Directory of ROMs shipped inside the wheel (this package dir)."""
     return Path(__file__).resolve().parent
 
 
 def get_rom_path(game_id: str) -> Path | None:
-    """Path to the packaged ROM for ``game_id`` (mirrors ``ale_py.roms.get_rom_path``).
+    """Path to the packaged ROM for ``game_id``.
 
     Returns ``None`` when no packaged ROM matches. The direct ``{game_id}.nes``
     name is tried first; failing that (e.g. a multiplayer id that shares a ROM
@@ -130,7 +130,7 @@ def import_roms(
 
 
 def resolve_rom(game_id: str, rom_path: str | Path | None = None) -> Path:
-    # ale-py-style resolution order: explicit path > packaged ROM > NESLE_ROMS_DIR registry.
+    # Resolution order: explicit path > packaged ROM > NESLE_ROMS_DIR registry.
     if rom_path is not None:
         path = Path(rom_path)
         if not path.exists():

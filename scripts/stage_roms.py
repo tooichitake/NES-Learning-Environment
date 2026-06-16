@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """CI: stage private ROMs into the package ROM home before ``maturin build``.
 
-The public repo never commits copyrighted ROMs (the ale-py model: ROMs ship in
+The public repo never commits copyrighted ROMs (ROMs ship in
 the wheel, not in the source tree). CI checks out a private ROM source and this
 script copies its ``*.nes`` into ``crates/nesle-py/python/nesle/roms/`` so
 maturin's ``include`` bundles them into the wheel. Cross-platform and no-op-safe:
