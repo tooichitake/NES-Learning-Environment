@@ -113,8 +113,8 @@ Four entry points — single- vs multi-agent, each non-vectorized or vectorized:
 
 | | Non-vectorized | Vectorized |
 |---|---|---|
-| **Single-agent** (Gymnasium) | `gym.make(id)` | `gym.make_vec(id, num_envs=…)` |
-| **Multi-agent** (PettingZoo) | `nesle.env.parallel_env(env_id=id)` | `make_multiplayer_vector_env(id, num_envs=…)` |
+| **Single-agent** (Gymnasium) | `gym.make("NESLE/…")` | `gym.make_vec("NESLE/…", num_envs=…)` |
+| **Multi-agent** (PettingZoo) | `nesle.env.parallel_env(env_id="NESLE/…")` | `make_multiplayer_vector_env("NESLE/…", num_envs=…)` |
 
 ### Single-agent · non-vectorized (Gymnasium)
 
@@ -181,8 +181,12 @@ obs, rewards, dones, truncated, infos = venv.step(actions)
 
 ## Environments
 
-Env ids are `NESLE/<Game>-<level>-<version>` (multi-player stems add a player
-tag, e.g. `SuperC-2P`). The version suffix selects the observation / preprocessing
+Env ids follow `NESLE/<game>[-<mode>]-<level>-v<version>`. The optional `<mode>`
+token names the cart's mode / player-count and is absent for single-mode games; the
+exact token differs per game — e.g. Bomberman 2 uses `Normal` / `VS` / `Battle`, while
+Super C and Ice Hockey use `1P` / `2P`. Example ids: `SuperMarioBros-1-1-v3` (no mode),
+`SuperC-2P-2-v3`, `Bomberman2-VS-1-v3`. Call `nesle.get_all_game_ids()` for the exact
+modes each game registers. The version suffix selects the observation / preprocessing
 profile:
 
 | Version | Profile |
@@ -284,6 +288,34 @@ cargo run -p nesle-server --features audio-synth   # with APU audio
 
 Pick a game + level in the UI and the server **auto-loads** that game's packaged
 ROM by SHA-1 (no upload); **Upload ROM** handles unregistered ROMs.
+
+### Connecting an RL agent (`nesle.agent_client`)
+
+`Agent` mode accepts external RL agents over WebSocket. With a game loaded in the
+browser (a human owns the console), connect an agent peer that receives its
+observation stream and sends back actions:
+
+```python
+import asyncio
+from nesle.agent_client import AgentClient
+
+def policy(obs):                  # obs: np.uint8, (H, W) grayscale or (H, W, channels)
+    return 0                      # return an action index (0 .. len(action_set) - 1)
+
+asyncio.run(AgentClient(name="my-agent").play(
+    env_id="NESLE/SuperMarioBros-1-1-v3",   # declares the agent's observation profile
+    policy=policy,                           # steps defaults to None -> runs until disconnected
+))
+```
+
+Or from the CLI (random actions if no policy is given):
+
+```bash
+python -m nesle.agent_client --env-id NESLE/SuperMarioBros-1-1-v3
+```
+
+Needs the `agent` extra (`pip install nesle[agent]`, which brings `websockets`) and a
+running `nesle-server` with the matching game loaded.
 
 ## Citing
 
