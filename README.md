@@ -18,7 +18,9 @@ vectorization, memory access, and tooling are all NESLE's own.
 
 ```python
 import gymnasium as gym
-import nesle  # importing registers the NESLE/* environments
+import nesle
+
+gym.register_envs(nesle)
 
 env = gym.make("NESLE/SuperMarioBros-1-1-v3")   # release wheels bundle ROMs (no rom_path)
 obs, info = env.reset()
@@ -122,6 +124,8 @@ Four entry points — single- vs multi-agent, each non-vectorized or vectorized:
 import gymnasium as gym
 import nesle
 
+gym.register_envs(nesle)
+
 # Raw env (v0): pick the observation type.
 raw = gym.make("NESLE/SuperMarioBros-1-1-v0", obs_type="rgb")        # or "grayscale" / "ram"
 
@@ -140,6 +144,8 @@ env.close()
 ```python
 import gymnasium as gym
 import nesle
+
+gym.register_envs(nesle)
 
 # Synchronous: preprocessed profiles build in a 4-frame stack.
 vec = gym.make_vec("NESLE/SuperMarioBros-1-1-v3", num_envs=8)
