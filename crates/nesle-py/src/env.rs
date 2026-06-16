@@ -110,27 +110,6 @@ impl PyNesEnv {
         ))
     }
 
-    #[pyo3(signature = (frame_skip, screen_size, maxpool, render_skip = true, terminal_on_life_loss = false, stack_num = 1))]
-    fn configure_obs(
-        &mut self,
-        frame_skip: usize,
-        screen_size: usize,
-        maxpool: bool,
-        render_skip: bool,
-        terminal_on_life_loss: bool,
-        stack_num: usize,
-    ) -> PyResult<()> {
-        self.configure_observation(
-            frame_skip,
-            screen_size,
-            screen_size,
-            maxpool,
-            render_skip,
-            terminal_on_life_loss,
-            stack_num,
-        )
-    }
-
     #[pyo3(signature = (frame_skip, width, height, maxpool, render_skip = true, terminal_on_life_loss = false, stack_num = 1))]
     #[allow(clippy::too_many_arguments)]
     fn configure_obs_shape(
@@ -160,7 +139,7 @@ impl PyNesEnv {
         noop_max: usize,
     ) -> PyResult<ObserveReset<'py>> {
         let pipe = self.obs.as_mut().ok_or_else(|| {
-            PyRuntimeError::new_err("configure_obs() must be called before observe_reset()")
+            PyRuntimeError::new_err("configure_obs_shape() must be called before observe_reset()")
         })?;
         let info = pipe
             .reset_in_place(&mut self.inner, noop_max)
@@ -175,7 +154,7 @@ impl PyNesEnv {
 
     fn observe_step<'py>(&mut self, py: Python<'py>, mask: u8) -> PyResult<ObserveStep<'py>> {
         let pipe = self.obs.as_mut().ok_or_else(|| {
-            PyRuntimeError::new_err("configure_obs() must be called before observe_step()")
+            PyRuntimeError::new_err("configure_obs_shape() must be called before observe_step()")
         })?;
         let s = pipe
             .step_in_place(&mut self.inner, &[mask])

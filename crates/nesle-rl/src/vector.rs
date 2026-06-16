@@ -420,6 +420,21 @@ impl NesVectorEnv {
         }
     }
 
+    /// Write per-env CPU RAM (the `ram_batch_into` write counterpart): `data` is
+    /// `num_envs * RAM_SIZE` bytes, one 2048-byte block per env. Call after a
+    /// full-batch barrier (workers idle) so each env Mutex locks uncontended.
+    pub fn set_ram_batch(&self, data: &[u8]) -> Result<()> {
+        assert_eq!(
+            data.len(),
+            self.ram_batch_byte_len(),
+            "ram batch length mismatch"
+        );
+        for (chunk, m) in data.chunks_exact(RAM_SIZE).zip(self.envs.iter()) {
+            m.lock().expect("env mutex poisoned").env.set_ram(chunk)?;
+        }
+        Ok(())
+    }
+
     #[cfg(test)]
     pub fn ram_batch(&self) -> Vec<Vec<u8>> {
         self.envs

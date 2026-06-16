@@ -35,7 +35,7 @@ pub static BOMBERMAN_2_VS_2P: GameSpec = GameSpec {
     four_score: false,
     mode: Some("VS"),
     minimal_actions: &BOMBERMAN_2_BATTLE_ACTIONS,
-    reward: bomberman_2_vs_dense_reward,
+    reward: bomberman_2_vs_reward,
     terminal: bomberman_2_terminal_2p,
     lives: bomberman_2_lives,
     in_transition: None,
@@ -202,70 +202,27 @@ fn bomberman_2_lives(cur: &[u8; 0x800]) -> [u8; 4] {
     [cur[0x0069], cur[0x006a], cur[0x006b], cur[0x006c]]
 }
 
-// VS dense reward (BOMBERMAN_2_VS_2P): round-over returns win/death only; live frames sum approach + clock penalty.
-const VS_POS_X: usize = 0x0072;
-const VS_POS_Y: usize = 0x0078;
-const VS_WIN: f32 = 200.0;
-/// Death > worst-case bomb-escape retreat (~5 cells x16px=80) so retreating beats dying; 6x16.
-const VS_DEATH: f32 = 96.0;
-/// +1 reward per pixel port p moves toward the opponent (signed) -- SMB's x_reward.
-const VS_APPROACH_SCALE: i32 = 1;
-/// Clip implausible per-frame pixel jumps (position resets), like SMB's x_reward guard.
-const VS_MAX_STEP_PX: i32 = 32;
-/// Penalty per in-game second the round clock loses (SMB clock penalty); doubled to push decisive play.
-const VS_TIME_PENALTY: f32 = 4.0;
-/// VS round timer (HUD "T:xxx") = three BCD digits, LSB-first; ticks ~1 / second.
-const VS_TIMER_ONES: usize = 0x055B;
-const VS_TIMER_TENS: usize = 0x055C;
-const VS_TIMER_HUNDREDS: usize = 0x055D;
+// VS sparse reward (BOMBERMAN_2_VS_2P): +1 to the lone survivor the frame the round
+// ends, -1 to anyone bombed out (both on a mutual KO). All dense shaping (approach /
+// brick / offense / exploration / anti-camp) lives in the trainer (train_bomberman.py),
+// where the nametable, blast model and per-step annealing are available; the env reward
+// is the canonical sparse game outcome only (Pommerman +1/-1 convention).
+const VS_WIN: f32 = 1.0;
+const VS_LOSS: f32 = -1.0;
 
-/// Manhattan pixel distance, port `p` in `ram_p` to port `o` in `ram_o` (split RAM lets approach hold the opponent fixed).
-fn vs_pixel_dist(ram_p: &[u8; 0x800], p: usize, ram_o: &[u8; 0x800], o: usize) -> i32 {
-    let px = ram_p[VS_POS_X + p] as i32;
-    let py = ram_p[VS_POS_Y + p] as i32;
-    let ox = ram_o[VS_POS_X + o] as i32;
-    let oy = ram_o[VS_POS_Y + o] as i32;
-    (px - ox).abs() + (py - oy).abs()
-}
-
-/// Decode the round timer from the 3 BCD digits; each clamped to 0..9 (boot-garbage guard).
-fn vs_timer(ram: &[u8; 0x800]) -> i32 {
-    let d = |a: usize| (ram[a] as i32).min(9);
-    100 * d(VS_TIMER_HUNDREDS) + 10 * d(VS_TIMER_TENS) + d(VS_TIMER_ONES)
-}
-
-fn bomberman_2_vs_dense_reward(prev_ram: &[u8; 0x800], cur_ram: &[u8; 0x800]) -> [f32; 4] {
+fn bomberman_2_vs_reward(prev_ram: &[u8; 0x800], cur_ram: &[u8; 0x800]) -> [f32; 4] {
     let mut r = [0.0f32; 4];
     let prev_alive: u32 = (0..2).map(|i| prev_ram[ALIVE_BASE + i] as u32).sum();
     let cur_alive: u32 = (0..2).map(|i| cur_ram[ALIVE_BASE + i] as u32).sum();
-    // Round over: survivor wins, the rest (death / mutual KO) lose; no per-step shaping.
+    // Round over (2 -> <=1 alive): survivor +1, death / mutual KO -1.
     if prev_alive >= 2 && cur_alive <= 1 {
         for (p, slot) in r.iter_mut().take(2).enumerate() {
             *slot = if cur_ram[ALIVE_BASE + p] == 1 {
                 VS_WIN
             } else {
-                -VS_DEATH
+                VS_LOSS
             };
         }
-        return r;
-    }
-    // Clock penalty: timer drop this frame * coeff (only decreases count); shared by both ports.
-    let dt = vs_timer(cur_ram) - vs_timer(prev_ram);
-    let time_pen = if (-9..0).contains(&dt) {
-        dt as f32 * VS_TIME_PENALTY
-    } else {
-        0.0
-    };
-    for (p, slot) in r.iter_mut().take(2).enumerate() {
-        let o = 1 - p;
-        // Signed pixels p moved toward the opponent this frame (opp held; toward +, away -).
-        let toward = vs_pixel_dist(prev_ram, p, cur_ram, o) - vs_pixel_dist(cur_ram, p, cur_ram, o);
-        let approach = if toward.abs() <= VS_MAX_STEP_PX {
-            (VS_APPROACH_SCALE * toward) as f32
-        } else {
-            0.0
-        };
-        *slot = approach + time_pen;
     }
     r
 }
@@ -419,81 +376,38 @@ mod tests {
         assert_eq!(bomberman_2_lives(&cur), [1, 0, 1, 1]);
     }
 
-    fn vs_ram(p1_alive: u8, p2_alive: u8, p1: (u8, u8), p2: (u8, u8)) -> [u8; 0x800] {
+    fn vs_ram(p1_alive: u8, p2_alive: u8) -> [u8; 0x800] {
         let mut r = [0u8; 0x800];
         r[ALIVE_BASE] = p1_alive;
         r[ALIVE_BASE + 1] = p2_alive;
-        r[VS_POS_X] = p1.0;
-        r[VS_POS_Y] = p1.1;
-        r[VS_POS_X + 1] = p2.0;
-        r[VS_POS_Y + 1] = p2.1;
         r
     }
 
     #[test]
-    fn vs_dense_approach_credits_only_the_mover() {
-        // P2 moves 4px toward stationary P1: active mover P2 earns +4, passive P1 earns 0.
-        let prev = vs_ram(1, 1, (16, 16), (100, 16));
-        let cur = vs_ram(1, 1, (16, 16), (96, 16));
-        let r = bomberman_2_vs_dense_reward(&prev, &cur);
-        assert_eq!(r[0], 0.0, "passive P1");
-        assert_eq!(r[1], 4.0, "active P2 moved 4px toward");
-    }
-
-    #[test]
-    fn vs_dense_approach_is_negative_when_retreating() {
-        // P2 moves 4 px AWAY from P1: signed own-movement goes negative (SMB-style).
-        let prev = vs_ram(1, 1, (16, 16), (96, 16));
-        let cur = vs_ram(1, 1, (16, 16), (100, 16));
-        let r = bomberman_2_vs_dense_reward(&prev, &cur);
-        assert_eq!(r[1], -4.0, "retreating P2 moved 4px away");
-    }
-
-    #[test]
-    fn vs_dense_approach_credits_chaser_when_gap_unchanged() {
-        // P1 chases P2 down 4px with the gap unchanged: own-movement still earns P1 +4.
-        let prev = vs_ram(1, 1, (16, 16), (16, 128));
-        let cur = vs_ram(1, 1, (16, 20), (16, 132));
-        let r = bomberman_2_vs_dense_reward(&prev, &cur);
-        assert_eq!(r[0], 4.0, "chaser P1 moved 4px toward, gap unchanged");
-    }
-
-    #[test]
-    fn vs_dense_terminal_win_and_loss() {
-        // P2 dies (2 -> 1 alive): survivor +WIN, loser -DEATH, no shaping terms.
-        let prev = vs_ram(1, 1, (16, 16), (32, 16));
-        let cur = vs_ram(1, 0, (16, 16), (32, 16));
+    fn vs_reward_zero_mid_round() {
+        // Both alive, round not over: no env reward (all shaping lives in the trainer).
         assert_eq!(
-            bomberman_2_vs_dense_reward(&prev, &cur),
-            [VS_WIN, -VS_DEATH, 0.0, 0.0]
+            bomberman_2_vs_reward(&vs_ram(1, 1), &vs_ram(1, 1)),
+            [0.0; 4]
         );
     }
 
     #[test]
-    fn vs_dense_terminal_mutual_ko_no_winner() {
-        // Both die same frame (2 -> 0 alive): both -DEATH, no survivor bonus.
-        let prev = vs_ram(1, 1, (16, 16), (32, 16));
-        let cur = vs_ram(0, 0, (16, 16), (32, 16));
+    fn vs_reward_terminal_win_and_loss() {
+        // P2 dies (2 -> 1 alive): survivor +1, loser -1.
         assert_eq!(
-            bomberman_2_vs_dense_reward(&prev, &cur),
-            [-VS_DEATH, -VS_DEATH, 0.0, 0.0]
+            bomberman_2_vs_reward(&vs_ram(1, 1), &vs_ram(1, 0)),
+            [VS_WIN, VS_LOSS, 0.0, 0.0]
         );
     }
 
     #[test]
-    fn vs_dense_time_penalty_tracks_clock_tick() {
-        // Timer 293 -> 292 (one tick), no movement: both ports pay -VS_TIME_PENALTY.
-        let mut prev = vs_ram(1, 1, (16, 16), (32, 16));
-        let mut cur = vs_ram(1, 1, (16, 16), (32, 16));
-        prev[VS_TIMER_HUNDREDS] = 2;
-        prev[VS_TIMER_TENS] = 9;
-        prev[VS_TIMER_ONES] = 3;
-        cur[VS_TIMER_HUNDREDS] = 2;
-        cur[VS_TIMER_TENS] = 9;
-        cur[VS_TIMER_ONES] = 2;
-        let r = bomberman_2_vs_dense_reward(&prev, &cur);
-        assert!((r[0] - (-VS_TIME_PENALTY)).abs() < 1e-5, "r0={}", r[0]);
-        assert!((r[1] - (-VS_TIME_PENALTY)).abs() < 1e-5, "r1={}", r[1]);
+    fn vs_reward_mutual_ko_both_lose() {
+        // Both die same frame (2 -> 0 alive): both -1, no survivor bonus.
+        assert_eq!(
+            bomberman_2_vs_reward(&vs_ram(1, 1), &vs_ram(0, 0)),
+            [VS_LOSS, VS_LOSS, 0.0, 0.0]
+        );
     }
 
     #[test]

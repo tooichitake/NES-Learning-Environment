@@ -155,7 +155,7 @@ impl NesEnv {
     }
 
     /// Toggle the level-transition fast-forward (default on). Off = faithful per-frame
-    /// stepping that shows the cutscene (server Play / Human-AI); on = the RL view.
+    /// stepping that shows the cutscene (server Play / Agent); on = the RL view.
     pub fn set_skip_transitions(&mut self, enabled: bool) {
         self.skip_transitions = enabled;
     }

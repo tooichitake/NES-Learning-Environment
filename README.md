@@ -20,10 +20,14 @@ vectorization, memory access, and tooling are all NESLE's own.
 import gymnasium as gym
 import nesle  # importing registers the NESLE/* environments
 
-env = gym.make("NESLE/SuperMarioBros-1-1-v2", rom_path="smb.nes")
+env = gym.make("NESLE/SuperMarioBros-1-1-v3")   # release wheels bundle ROMs (no rom_path)
 obs, info = env.reset()
 obs, reward, terminated, truncated, info = env.step(env.action_space.sample())
 ```
+
+![NES games rendered by NESLE](assets/games.png)
+
+<sub>NESLE's Rust NES core rendering a sample of its supported games.</sub>
 
 ## Features
 
@@ -34,13 +38,15 @@ obs, reward, terminated, truncated, info = env.step(env.action_space.sample())
   multi-agent envs** (2–4 players, last-standing / versus / co-op).
 - **Three observation types** — RGB `(240, 256, 3)`, grayscale `(240, 256)`, and
   raw RAM `(2048,)`.
-- **Built-in preprocessing** — 84×84 grayscale, frame-skip, 2-frame max-pool,
+- **Built-in preprocessing** — 112×112 grayscale, frame-skip, 2-frame max-pool,
   frame-stacking, sticky actions, and no-op resets, selected per env version.
 - **Built-in vectorization in Rust** — a synchronous batched backend and an
   asynchronous (envpool-style) backend, both with the GIL released.
 - **Direct memory access** — read the full NES RAM and the PPU tile field, and
   save / restore emulator state (see [Memory & state interface](#memory--state-interface)).
 - **abi3 wheels** — one wheel per platform covers Python 3.10+.
+- **Browser viewer + server** (`nesle-server`) — play live, watch agents, and step
+  the RL env frame-by-frame in the browser (see [Server / viewer](#server--viewer)).
 
 ## Installation
 
@@ -67,33 +73,50 @@ maturin develop --release          # build + install into the active environment
 
 ## ROMs
 
-NESLE ships **no game ROMs** — you supply your own `.nes` files. A ROM is
-resolved by its **SHA-1** (filename-agnostic, validated against NESLE's game
-table), tried in this order:
+NES ROMs are copyrighted and live outside the source tree; NESLE resolves one by
+its **SHA-1** (filename-agnostic, validated against NESLE's game table).
+
+- **Release wheels bundle the ROMs for the supported games**, so you pass **no**
+  `rom_path` — `gym.make("NESLE/<id>")` works out of the box for any
+  [supported game](#supported-games).
+- **A from-source build is ROM-free.** Drop your `.nes` files into the default ROM
+  folder `crates/nesle-py/python/nesle/roms/` (git-ignored) *before*
+  `maturin develop` / `maturin build` and they are bundled just like a release
+  wheel — or resolve them at runtime without rebuilding (order below).
+
+Runtime resolution order:
 
 1. an explicit `rom_path=` argument;
-2. a ROM bundled inside the installed wheel (if you built a wheel with ROMs);
-3. a directory you registered with `nesle.import_roms(...)`, or pointed at with
-   the `NESLE_ROMS_DIR` environment variable.
+2. a ROM bundled in the installed wheel (the release-wheel default);
+3. a folder registered with `nesle.import_roms(...)`, or pointed at by the
+   `NESLE_ROMS_DIR` environment variable.
 
 ```python
 import gymnasium as gym
 import nesle
 
-# (1) explicit path
-env = gym.make("NESLE/SuperMarioBros-1-1-v2", rom_path="/path/to/smb.nes")
+# Release wheel: ROMs are bundled -> no rom_path needed.
+env = gym.make("NESLE/SuperMarioBros-1-1-v3")
 
-# (3) register a folder once (copied + indexed by SHA-1), then make envs by id:
+# Custom / from-source ROMs: register a folder once (copied + indexed by SHA-1)...
 nesle.import_roms("/path/to/roms")
-#   or per-process:  export NESLE_ROMS_DIR=/path/to/roms
+#   ...or per-process:  export NESLE_ROMS_DIR=/path/to/roms
+#   ...or per-call:     gym.make("NESLE/SuperMarioBros-1-1-v3", rom_path="/path/to/smb.nes")
 
 nesle.get_all_game_ids()       # every supported game id
-nesle.get_rom_path(game_id)    # packaged path, if present
+nesle.get_rom_path(game_id)    # bundled ROM path, if present
 ```
 
 ## Usage
 
-### Single-agent (Gymnasium)
+Four entry points — single- vs multi-agent, each non-vectorized or vectorized:
+
+| | Non-vectorized | Vectorized |
+|---|---|---|
+| **Single-agent** (Gymnasium) | `gym.make(id)` | `gym.make_vec(id, num_envs=…)` |
+| **Multi-agent** (PettingZoo) | `nesle.env.parallel_env(env_id=id)` | `make_multiplayer_vector_env(id, num_envs=…)` |
+
+### Single-agent · non-vectorized (Gymnasium)
 
 ```python
 import gymnasium as gym
@@ -102,8 +125,8 @@ import nesle
 # Raw env (v0): pick the observation type.
 raw = gym.make("NESLE/SuperMarioBros-1-1-v0", obs_type="rgb")        # or "grayscale" / "ram"
 
-# Standard preprocessed training env (v2): 84×84 grayscale, frame-skip 4.
-env = gym.make("NESLE/SuperMarioBros-1-1-v2")
+# Standard preprocessed training env (v3): 112×112 grayscale, frame-skip 4, sticky actions.
+env = gym.make("NESLE/SuperMarioBros-1-1-v3")
 obs, info = env.reset(seed=0)
 for _ in range(1000):
     obs, reward, terminated, truncated, info = env.step(env.action_space.sample())
@@ -112,14 +135,15 @@ for _ in range(1000):
 env.close()
 ```
 
-### Vectorized
+### Single-agent · vectorized (Gymnasium)
 
 ```python
 import gymnasium as gym
+import nesle
 
 # Synchronous: preprocessed profiles build in a 4-frame stack.
-vec = gym.make_vec("NESLE/SuperMarioBros-1-1-v2", num_envs=8)
-batch_obs, infos = vec.reset()                       # (8, 4, 84, 84)
+vec = gym.make_vec("NESLE/SuperMarioBros-1-1-v3", num_envs=8)
+batch_obs, infos = vec.reset()                       # (8, 4, 112, 112)
 
 # Asynchronous (envpool-style): 0 < batch_size < num_envs.
 avec = gym.make_vec("NESLE/SuperMarioBros-1-1-v3", num_envs=12, batch_size=4)
@@ -128,15 +152,31 @@ obs, rewards, terms, truncs, info = avec.recv()      # info["env_id"] demuxes
 avec.send(actions)                                   # one action per env in the recv batch
 ```
 
-### Multi-agent (PettingZoo)
+### Multi-agent · non-vectorized (PettingZoo)
 
 ```python
+import nesle
 from nesle.env import parallel_env
 
-env = parallel_env(env_id="NESLE/SuperC-2P-2-v0", rom_path="superc.nes")
+env = parallel_env(env_id="NESLE/SuperC-2P-2-v3")    # release wheels bundle ROMs (no rom_path)
 obs, infos = env.reset()
 actions = {agent: env.action_space(agent).sample() for agent in env.agents}
 obs, rewards, terminations, truncations, infos = env.step(actions)
+```
+
+### Multi-agent · vectorized self-play
+
+```python
+import numpy as np
+from nesle.vector_env import make_multiplayer_vector_env
+
+# K parallel matches, each with `num_players` controller ports (one shared screen / match).
+venv = make_multiplayer_vector_env("NESLE/Bomberman2-VS-1-v3", num_envs=16)
+obs, infos = venv.reset()                            # (num_envs * num_players, 4, 112, 112)
+
+# One action per AGENT slot, unit-major (slot = unit * num_players + port):
+actions = np.random.randint(venv.num_actions, size=venv.num_agents)
+obs, rewards, dones, truncated, infos = venv.step(actions)
 ```
 
 ## Environments
@@ -148,13 +188,33 @@ profile:
 | Version | Profile |
 |---|---|
 | `v0` | Raw observation (`obs_type` ∈ `rgb` / `grayscale` / `ram`), configurable action repeat. |
-| `v1` | 84×84 grayscale, frame-skip 4, 2-frame max-pool, terminal-on-life-loss. |
+| `v1` | 112×112 grayscale, frame-skip 4, 2-frame max-pool, terminal-on-life-loss. |
 | `v2` | Same as v1 with sprite-limit removal and max-pool disabled. |
 | `v3` | v2 + sticky actions (`repeat_action_probability = 0.25`). |
 
-`NoFrameskip` variants keep the observation semantics but set action repeat to 1.
-Episode summaries (`info["episode"]`) are produced by Gymnasium's
-`RecordEpisodeStatistics` wrapper, not by the env itself.
+**`v3`** (sticky actions, the ALE-standard) is the recommended training profile —
+the examples above use it. `NoFrameskip` variants keep the observation semantics
+but set action repeat to 1. Episode summaries (`info["episode"]`) are produced by
+Gymnasium's `RecordEpisodeStatistics` wrapper, not by the env itself.
+
+![Observation pipeline: raw RGB to grayscale to 112x112 obs](assets/obs_pipeline.png)
+
+<sub>The preprocessing pipeline: native RGB → grayscale → 112×112 training observation.</sub>
+
+## Supported games
+
+20 games ship today. Build an env-id as `NESLE/<stem>-<level>-v3`; call
+`nesle.get_all_game_ids()` for the authoritative list at runtime, and
+`nesle.parse_env_id(env_id)` to inspect one.
+
+**Single-agent (Gymnasium):**
+SuperMarioBros · SuperMarioBros2 · SuperMarioBros3 · KungFu · Castlevania ·
+SuperC-1P · AdventureIsland · DuckTales · MegaMan2 · PacMan · MarioBros ·
+Bomberman · Bomberman2-Normal · IceHockey-1P
+
+**Multi-agent (PettingZoo):**
+SuperC-2P · IceHockey-2P · Bomberman2-VS · Bomberman2-Battle · RCProAm2-4P ·
+Roundball2on2-4P
 
 ## Memory & state interface
 
@@ -190,25 +250,40 @@ ram = venv.get_ram()          # (num_envs, 2048) CPU RAM, one per match
 field = venv.get_nametable()  # (num_envs, vram) PPU tile field (walls / bricks / bombs / …)
 ```
 
-## Building wheels & CI/CD
+## Server / viewer
 
-`.github/workflows/build-wheels.yml` builds optimized abi3 wheels for Linux
-x86-64, Windows x86-64, and macOS arm64 on every push to `main`, and attaches
-them to the GitHub Release on a `v*` tag. Each wheel is a release build
-(thin-LTO, `codegen-units=1`, `-Ctarget-cpu` baseline) with an optional PGO pass
-driven by a mapper-diverse workload (`scripts/pgo_workload.py`).
+`nesle-server` is a WebSocket console host that serves a browser thin-client
+**viewer** — run any supported game live in the browser, watch RL agents play, or
+step the env frame-by-frame. The browser only renders streamed frames and sends
+controller input; the emulator, reward, preprocessing, and start-state logic all
+stay in Rust.
 
-Because NES ROMs are copyrighted, the public repo contains none. CI injects them
-at build time from a **private** source so released wheels can ship complete:
+![NESLE browser viewer — Play / Debug / Agent modes](assets/server-ui.png)
 
-- Secret `ROMS_DEPLOY_KEY` — a read-only SSH deploy key for the private ROM repo.
-- Variable `ROMS_REPO` — `owner/name` of that repo (default `<owner>/nesle-roms`).
+<sub>The `nesle-server` browser viewer in all three modes — **Play** (human play), **Debug** (stepped env + observation), **Agent** (connected RL agents).</sub>
 
-CI checks out the private repo, stages its `*.nes` into the package
-(`scripts/stage_roms.py`), then builds. With no key set (e.g. fork PRs) CI builds
-a ROM-free wheel and skips PGO. To build a complete wheel locally, just keep the
-ROMs in `crates/nesle-py/python/nesle/roms/` (git-ignored) and run
-`maturin build --release`.
+Three modes (the segmented control at the top):
+- **Play** — faithful 60 Hz play with keyboard controllers (1–4 players).
+- **Debug** — advance the *preprocessed* env one frame-skip window at a time and
+  watch the agent's observation, reward, lives, and terminal flags.
+- **Agent** — humans and RL agents share one console as peer players, with a live
+  per-agent observation grid (the Agent Monitor).
+
+Plus **Record** (replay-format input capture, replayable by the Python envs) and
+**Dump RAM** (2 KB work RAM → base64).
+
+```bash
+cargo run -p nesle-server                          # then open http://127.0.0.1:8090
+cargo run -p nesle-server --features audio-synth   # with APU audio
+```
+
+| Env var | Default | Meaning |
+|---|---|---|
+| `NESLE_SERVER_ADDR` | `127.0.0.1:8090` | HTTP / WebSocket bind address |
+| `NESLE_WEB_DIR` | `crates/nesle-server/web` | static UI directory |
+
+Pick a game + level in the UI and the server **auto-loads** that game's packaged
+ROM by SHA-1 (no upload); **Upload ROM** handles unregistered ROMs.
 
 ## License
 

@@ -5,6 +5,7 @@ members = [
     "crates/nesle-core",
     "crates/nesle-rl",
     "crates/nesle-py",
+    "crates/nesle-server",
 ]
 
 [workspace.package]

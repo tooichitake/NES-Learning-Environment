@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>NESLE Console</title>
+<link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <div class="app">
+    <div class="topbar glass" role="toolbar" aria-label="Console controls">
+      <div class="titlebar">
+        <h1>NESLE Console</h1>
+      </div>
+      <div class="seg glass" id="modeSeg" role="tablist" aria-label="Console mode">
+        <span class="seg-ind" id="segInd"></span>
+        <button data-mode="play" class="active" role="tab" aria-selected="true">Play</button>
+        <button data-mode="rl" role="tab" aria-selected="false" tabindex="-1">Debug</button>
+        <button data-mode="human" role="tab" aria-selected="false" tabindex="-1">Agent</button>
+      </div>
+      <div class="panel-toggles">
+        <button class="mini-btn" id="btnViewMenu" type="button" aria-haspopup="menu" aria-expanded="false"><span class="full-label">View</span><span class="short-label">View</span></button>
+        <div class="view-menu-popover glass" id="viewMenu" role="menu" hidden>
+          <div class="menu-caption">Panels</div>
+          <button class="mini-btn" id="btnToggleMonitor" type="button" role="menuitemcheckbox" aria-controls="monitor" aria-pressed="false"><span>Agent Monitor</span><span>Off</span></button>
+          <button class="mini-btn active" id="btnToggleControls" type="button" role="menuitemcheckbox" aria-controls="controlsPanel" aria-pressed="true"><span>Controls</span><span>On</span></button>
+          <div class="menu-sep"></div>
+          <button class="mini-btn" id="btnResetLayoutMenu" type="button" role="menuitem">Reset Layout</button>
+        </div>
+      </div>
+      <div class="rom-row">
+        <button class="btn btn-primary file-label" id="btnUploadRom" type="button">Upload ROM</button>
+        <input type="file" id="romFile" accept=".nes,.bin">
+        <span id="fileName" class="mini"></span>
+        <label class="mini">Game <select id="gameSel"></select></label>
+        <label class="mini" id="modeLabel">Mode <select id="modeSel"></select></label>
+        <label class="mini">Level <select id="levelSel"></select></label>
+      </div>
+    </div>
+    <div class="workbench" id="workbench">
+    <div class="stage">
+      <div class="screen-dock glass">
+        <div class="screen-caption"><span>Game Output</span><span class="screen-tools"><span class="screen-badge">1:1 native</span><span>256x240</span></span></div>
+        <div class="views"><canvas id="native" class="screen" width="256" height="240" style="width:256px;height:240px" role="img" aria-label="Native NES game output"></canvas></div>
+      </div>
+    </div>
+      <section id="monitor" class="panel floatable glass" data-panel="inspector" data-modes="rl human" role="region" aria-labelledby="monitorTitle">
+        <div class="panel-head" data-panel-handle>
+          <h2 id="monitorTitle">Agent Monitor</h2>
+          <div class="panel-tools">
+            <span class="mini">1:1 pixels</span>
+            <button class="icon-btn" type="button" data-collapse-panel="inspector" aria-controls="monitor" aria-label="Collapse Agent Monitor" title="Collapse Agent Monitor">
+              <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 10 8 6l4 4"/></svg>
+            </button>
+            <button class="icon-btn" type="button" data-hide-panel="inspector" aria-controls="monitor" aria-label="Hide Agent Monitor" title="Hide Agent Monitor">
+              <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4.5 4.5 11.5 11.5M11.5 4.5 4.5 11.5"/></svg>
+            </button>
+          </div>
+        </div>
+        <div class="panel-body">
+        <!-- Debug: the single stepped-agent observation + its stats. -->
+        <div class="rlview" data-modes="rl">
+          <div class="monitor-strip"><span class="status-pill live" id="iLive">Live</span><span class="status-pill" id="iDone">Running</span></div>
+          <h3 id="obsCap">Frame</h3>
+          <div class="obswrap"><canvas id="obs" class="screen" width="84" height="84" role="img" aria-label="Agent monitor frame"></canvas></div>
+          <div class="stats stats-solo">
+            <div class="tile"><strong>Step</strong><span id="iEp">0</span></div>
+          </div>
+          <!-- Per-port reward/return/lives (monitor reports outcomes; actions live in Controls). -->
+          <div class="agent-stats" id="agentStats"></div>
+        </div>
+        <!-- Agent: one debug-style observation card per connected agent. -->
+        <div class="humanview" data-modes="human">
+          <div class="agentbar" id="agentBar">
+            <span class="agent-dot" id="agentDot"></span><span id="agentText">Waiting for an agent...</span>
+          </div>
+          <div class="agentgrid" id="agentGrid"></div>
+        </div>
+        </div>
+      </section>
+
+    <!-- Console: floating controls panel (per-mode, auto height, no scroll) -->
+    <section id="controlsPanel" class="console panel floatable glass" data-panel="controls" role="region" aria-labelledby="controlsTitle">
+      <div class="panel-head" data-panel-handle>
+        <div class="panel-title-group">
+          <h2 id="controlsTitle">Controls</h2>
+          <div class="module-switch" id="controlsTabs" role="tablist" aria-label="Controls module">
+            <button type="button" data-controls-tab="session" role="tab" aria-selected="false" aria-controls="controlsModuleSession">Session</button>
+            <button type="button" data-controls-tab="input" role="tab" aria-selected="true" aria-controls="controlsModuleInput" class="active">Input</button>
+            <button type="button" data-controls-tab="diagnostics" role="tab" aria-selected="false" aria-controls="controlsModuleDiagnostics">Diagnostics</button>
+          </div>
+        </div>
+        <div class="panel-tools">
+          <button class="icon-btn" type="button" data-collapse-panel="controls" aria-controls="controlsPanel" aria-label="Collapse Controls" title="Collapse Controls">
+            <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 10 8 6l4 4"/></svg>
+          </button>
+          <button class="icon-btn" type="button" data-hide-panel="controls" aria-controls="controlsPanel" aria-label="Hide Controls" title="Hide Controls">
+            <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4.5 4.5 11.5 11.5M11.5 4.5 4.5 11.5"/></svg>
+          </button>
+        </div>
+      </div>
+      <div class="panel-body console-body">
+      <section class="control-module" id="controlsModuleSession" data-controls-module="session" data-modes="play rl human" aria-label="Session controls" hidden>
+      <h3 class="module-title">Session</h3>
+      <div class="cgroup session-actions" data-modes="play human">
+        <h3>Playback</h3>
+        <div class="btnrow">
+          <button class="btn btn-good" id="btnRun" disabled><svg viewBox="0 0 16 16"><rect x="3.5" y="2.5" width="3" height="11" rx="1"/><rect x="9.5" y="2.5" width="3" height="11" rx="1"/></svg><span>Pause</span></button>
+          <button class="btn btn-danger" id="btnReset" disabled><svg viewBox="0 0 16 16"><path d="M8 3a5 5 0 1 0 4.6 3 .9.9 0 0 0-1.6.8A3.2 3.2 0 1 1 8 4.8V6.5l3.2-2.2L8 1.5z"/></svg><span>Reset</span></button>
+        </div>
+      </div>
+      <div class="cgroup session-actions" data-modes="rl">
+        <h3>Stepping</h3>
+        <div class="btnrow">
+          <label class="row sw" style="gap:8px"><span class="lbl" style="min-width:auto">Auto-step</span><label class="switch"><input type="checkbox" id="autoTgl"><span class="track"></span><span class="knob"></span></label></label>
+          <span class="row"><span class="lbl" style="min-width:auto">Rate</span><input type="range" id="stepRate" min="1" max="30" value="8"><span class="val" id="stepRateV">8</span>/s</span>
+          <button class="btn btn-danger" id="btnReset2" disabled><span>Reset</span></button>
+        </div>
+      </div>
+      </section>
+
+      <section class="control-module" id="controlsModuleInput" data-controls-module="input" data-modes="play rl human" aria-label="Input controls">
+      <h3 class="module-title">Input</h3>
+      <div class="cgroup" id="controllerSources" data-modes="play human">
+        <h3>Controllers</h3>
+        <div class="source-list">
+          <div class="source-row" id="ctlrow0"><span class="who">1</span><span class="role-badge free" id="ctlRole0">Free</span><input class="peer-name-field" id="ctlName0" type="text" readonly tabindex="-1"><select class="source-select" id="ctlSource0" aria-label="Controller 1 source"></select></div>
+          <div class="source-row" id="ctlrow1"><span class="who">2</span><span class="role-badge free" id="ctlRole1">Free</span><input class="peer-name-field" id="ctlName1" type="text" readonly tabindex="-1"><select class="source-select" id="ctlSource1" aria-label="Controller 2 source"></select></div>
+          <div class="source-row" id="ctlrow2"><span class="who">3</span><span class="role-badge free" id="ctlRole2">Free</span><input class="peer-name-field" id="ctlName2" type="text" readonly tabindex="-1"><select class="source-select" id="ctlSource2" aria-label="Controller 3 source"></select></div>
+          <div class="source-row" id="ctlrow3"><span class="who">4</span><span class="role-badge free" id="ctlRole3">Free</span><input class="peer-name-field" id="ctlName3" type="text" readonly tabindex="-1"><select class="source-select" id="ctlSource3" aria-label="Controller 4 source"></select></div>
+        </div>
+      </div>
+
+      <!-- One gamepad per controller this browser owns; keyboard layouts follow ownership order, not port. -->
+      <div class="cgroup" id="padGroup" data-modes="play human">
+        <h3>Gamepad</h3>
+        <div class="pads">
+          <div class="padwrap" id="padwrap0">
+            <div class="padlabel" id="padlabel0">Controller 1</div>
+            <div class="pad" data-port="0">
+              <div class="dpad">
+                <button class="pad-btn up"    data-bit="16"><span class="g">▲</span><span class="k">W</span></button>
+                <button class="pad-btn left"  data-bit="64"><span class="g">◀</span><span class="k">A</span></button>
+                <button class="pad-btn right" data-bit="128"><span class="g">▶</span><span class="k">D</span></button>
+                <button class="pad-btn down"  data-bit="32"><span class="g">▼</span><span class="k">S</span></button>
+              </div>
+              <div class="center">
+                <button class="pad-btn cap" data-bit="4"><span class="g">Select</span><span class="k">1</span></button>
+                <button class="pad-btn cap" data-bit="8"><span class="g">Start</span><span class="k">2</span></button>
+              </div>
+              <div class="face"><div class="ab">
+                <button class="pad-btn btnB round" data-bit="2"><span class="g">B</span><span class="k">F</span></button>
+                <button class="pad-btn btnA round" data-bit="1"><span class="g">A</span><span class="k">G</span></button>
+              </div></div>
+            </div>
+          </div>
+          <div class="padwrap" id="padwrap1" style="display:none">
+            <div class="padlabel">Controller 2</div>
+            <div class="pad" data-port="1">
+              <div class="dpad">
+                <button class="pad-btn up"    data-bit="16"><span class="g">▲</span><span class="k">↑</span></button>
+                <button class="pad-btn left"  data-bit="64"><span class="g">◀</span><span class="k">←</span></button>
+                <button class="pad-btn right" data-bit="128"><span class="g">▶</span><span class="k">→</span></button>
+                <button class="pad-btn down"  data-bit="32"><span class="g">▼</span><span class="k">↓</span></button>
+              </div>
+              <div class="center">
+                <button class="pad-btn cap" data-bit="4"><span class="g">Select</span><span class="k">/</span></button>
+                <button class="pad-btn cap" data-bit="8"><span class="g">Start</span><span class="k">↵</span></button>
+              </div>
+              <div class="face"><div class="ab">
+                <button class="pad-btn btnB round" data-bit="2"><span class="g">B</span><span class="k">,</span></button>
+                <button class="pad-btn btnA round" data-bit="1"><span class="g">A</span><span class="k">.</span></button>
+              </div></div>
+            </div>
+          </div>
+          <!-- Controllers 3 & 4 get keyboard hints when among this browser's first two owned ports. -->
+          <div class="padwrap" id="padwrap2" style="display:none">
+            <div class="padlabel">Controller 3</div>
+            <div class="pad" data-port="2">
+              <div class="dpad">
+                <button class="pad-btn up"    data-bit="16"><span class="g">▲</span></button>
+                <button class="pad-btn left"  data-bit="64"><span class="g">◀</span></button>
+                <button class="pad-btn right" data-bit="128"><span class="g">▶</span></button>
+                <button class="pad-btn down"  data-bit="32"><span class="g">▼</span></button>
+              </div>
+              <div class="center">
+                <button class="pad-btn cap" data-bit="4"><span class="g">Select</span></button>
+                <button class="pad-btn cap" data-bit="8"><span class="g">Start</span></button>
+              </div>
+              <div class="face"><div class="ab">
+                <button class="pad-btn btnB round" data-bit="2"><span class="g">B</span></button>
+                <button class="pad-btn btnA round" data-bit="1"><span class="g">A</span></button>
+              </div></div>
+            </div>
+          </div>
+          <div class="padwrap" id="padwrap3" style="display:none">
+            <div class="padlabel">Controller 4</div>
+            <div class="pad" data-port="3">
+              <div class="dpad">
+                <button class="pad-btn up"    data-bit="16"><span class="g">▲</span></button>
+                <button class="pad-btn left"  data-bit="64"><span class="g">◀</span></button>
+                <button class="pad-btn right" data-bit="128"><span class="g">▶</span></button>
+                <button class="pad-btn down"  data-bit="32"><span class="g">▼</span></button>
+              </div>
+              <div class="center">
+                <button class="pad-btn cap" data-bit="4"><span class="g">Select</span></button>
+                <button class="pad-btn cap" data-bit="8"><span class="g">Start</span></button>
+              </div>
+              <div class="face"><div class="ab">
+                <button class="pad-btn btnB round" data-bit="2"><span class="g">B</span></button>
+                <button class="pad-btn btnA round" data-bit="1"><span class="g">A</span></button>
+              </div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Debug: drive the agent via its action space (no frame rate) -->
+      <div class="cgroup" data-modes="rl">
+        <h3>Action Space</h3>
+        <div class="btnrow" id="actBtns"></div>
+      </div>
+      </section>
+
+      <section class="control-module" id="controlsModuleDiagnostics" data-controls-module="diagnostics" data-modes="play rl human" aria-label="Diagnostics controls" hidden>
+      <h3 class="module-title">Diagnostics</h3>
+      <div class="cgroup" data-modes="play rl human">
+        <h3>Capture</h3>
+        <div class="btnrow">
+          <button class="btn" id="btnRec" disabled><svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="5"/></svg><span>Record</span></button>
+          <button class="btn" id="btnRam" disabled><svg viewBox="0 0 16 16"><rect x="2.5" y="3" width="11" height="4" rx="1"/><rect x="2.5" y="9" width="11" height="4" rx="1"/></svg><span>Dump RAM</span></button>
+        </div>
+      </div>
+      <div class="cgroup" data-modes="rl">
+        <h3>Preprocessing</h3>
+        <div class="pp">
+          <div class="pp-col">
+            <span class="pp-head">Observation Pipeline</span>
+            <span class="lbl">Obs size</span><input type="range" id="obsSize" min="42" max="168" step="2" value="112"><span class="val" id="obsSizeV">112</span>
+            <span class="lbl">Frame-skip</span><input type="range" id="frameSkip" min="1" max="8" value="4"><span class="val" id="frameSkipV">4</span>
+          </div>
+          <div class="pp-col">
+            <span class="pp-head">Rendering</span>
+            <!-- no-flicker default pairs remove_sprite_limit=on with maxpool=off (preprocessing.py: maxpool=not remove_sprite_limit). -->
+            <span class="lbl">Max-pool</span><label class="switch"><input type="checkbox" id="maxpoolTgl"><span class="track"></span><span class="knob"></span></label><span></span>
+            <span class="lbl">Sprite-flicker off</span><label class="switch"><input type="checkbox" id="spriteTgl" checked><span class="track"></span><span class="knob"></span></label><span></span>
+            <span class="lbl">RGB obs</span><label class="switch"><input type="checkbox" id="rgbTgl"><span class="track"></span><span class="knob"></span></label><span></span>
+          </div>
+          <div class="pp-col">
+            <span class="pp-head">Reward</span>
+            <span class="lbl">Clip +</span><input type="range" id="clipPos" min="0" max="10" step="0.5" value="0"><span class="val" id="clipPosV">off</span>
+            <span class="lbl">Clip −</span><input type="range" id="clipNeg" min="0" max="10" step="0.5" value="0"><span class="val" id="clipNegV">off</span>
+          </div>
+          <div class="pp-col">
+            <span class="pp-head">Episode</span>
+            <span class="lbl">End on life loss</span><label class="switch"><input type="checkbox" id="lifeLoss" checked><span class="track"></span><span class="knob"></span></label><span></span>
+            <span class="lbl">Sticky prob</span><input type="range" id="stickyProb" min="0" max="1" step="0.05" value="0"><span class="val" id="stickyProbV">0</span>
+            <span class="lbl">No-op reset</span><input type="range" id="noopMax" min="0" max="30" value="0"><span class="val" id="noopMaxV">0</span>
+          </div>
+        </div>
+      </div>
+      </section>
+      </div>
+    </section>
+    </div>
+  </div>
+
+<script type="module" src="./app.js"></script>
+</body>
+</html>

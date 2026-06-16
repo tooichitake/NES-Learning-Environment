@@ -333,6 +333,25 @@ class NESSinglePlayerVectorEnv(VectorEnv):
         """Per-env PPU nametable / CIRAM tile field ``(num_envs, vram_len)``."""
         return np.frombuffer(self._env.nametable_batch(), dtype=np.uint8).reshape(self.num_envs, -1)
 
+    def get_screen_grayscale(self) -> np.ndarray:
+        """Per-env native grayscale screen ``(num_envs, 240, 256)`` (independent of obs_type)."""
+        return np.frombuffer(self._env.grayscale_batch(), dtype=np.uint8).reshape(
+            self.num_envs, 240, 256
+        )
+
+    def get_screen_rgb(self) -> np.ndarray:
+        """Per-env native RGB screen ``(num_envs, 240, 256, 3)`` (independent of obs_type)."""
+        return np.frombuffer(self._env.rgb_batch(), dtype=np.uint8).reshape(
+            self.num_envs, 240, 256, 3
+        )
+
+    def set_ram(self, ram) -> None:
+        """Overwrite every env's CPU RAM; ``ram`` is ``(num_envs, 2048)`` uint8."""
+        arr = np.ascontiguousarray(ram, dtype=np.uint8)
+        if arr.shape != (self.num_envs, 2048):
+            raise ValueError(f"RAM must have shape ({self.num_envs}, 2048), got {arr.shape}")
+        self._env.set_ram_batch(arr.tobytes())
+
     def _single_obs(self) -> np.ndarray:
         if self._preprocessed:
             shape = (
@@ -530,6 +549,25 @@ class NESMultiPlayerVectorEnv:
         scripted bots read it from here."""
         flat = np.frombuffer(self._env.nametable_batch(), dtype=np.uint8)
         return flat.reshape(self.num_envs, -1)
+
+    def get_screen_grayscale(self) -> np.ndarray:
+        """Per-match native grayscale screen ``(num_envs, 240, 256)`` -- one shared screen per match."""
+        return np.frombuffer(self._env.grayscale_batch(), dtype=np.uint8).reshape(
+            self.num_envs, 240, 256
+        )
+
+    def get_screen_rgb(self) -> np.ndarray:
+        """Per-match native RGB screen ``(num_envs, 240, 256, 3)`` -- one shared screen per match."""
+        return np.frombuffer(self._env.rgb_batch(), dtype=np.uint8).reshape(
+            self.num_envs, 240, 256, 3
+        )
+
+    def set_ram(self, ram) -> None:
+        """Overwrite every match's CPU RAM; ``ram`` is ``(num_envs, 2048)`` uint8."""
+        arr = np.ascontiguousarray(ram, dtype=np.uint8)
+        if arr.shape != (self.num_envs, 2048):
+            raise ValueError(f"RAM must have shape ({self.num_envs}, 2048), got {arr.shape}")
+        self._env.set_ram_batch(arr.tobytes())
 
     def _stacked_obs(self) -> np.ndarray:
         """Per-slot frame-stacked obs. The Rust ObsPipeline already produced one

@@ -1,0 +1,30 @@
+[package]
+name = "nesle-server"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[[bin]]
+name = "nesle-server"
+path = "src/main.rs"
+
+[features]
+# Opt-in APU audio synthesis for the human stream (off by default so the workspace
+# gate build stays audio-free; the server enables it at runtime when built with it).
+# Run the console with sound: `cargo run -p nesle-server --features audio-synth`.
+audio-synth = ["nesle-rl/audio-synth"]
+
+[dependencies]
+# Env layer (the "kernel skin"): the one authoritative console + observation ops.
+nesle-rl = { path = "../nesle-rl" }
+# Async WebSocket host: serve the thin-UI static files (web/) + the /ws session.
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync", "time", "net"] }
+axum = { version = "0.7", features = ["ws"] }
+tower-http = { version = "0.6", features = ["fs"] }
+futures-util = "0.3"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+base64 = "0.22"
+# Auto-resolve a registered game's packaged ROM by GameSpec sha1 (see session.rs).
+sha1 = "0.10"

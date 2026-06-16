@@ -141,12 +141,6 @@ impl PyNesVectorEnv {
         self.inner.num_envs()
     }
 
-    /// Number of UNITS (worker-envs). Each unit drives `players()` controller ports,
-    /// so the Python facade exposes `num_units() * players()` agent slots.
-    fn num_units(&self) -> usize {
-        self.inner.num_envs()
-    }
-
     /// Controller ports each unit drives (1..=game.players).
     fn players(&self) -> u8 {
         self.inner.players()
@@ -221,6 +215,10 @@ impl PyNesVectorEnv {
             self.inner.ram_batch_into(bytes);
             Ok(())
         })
+    }
+
+    fn set_ram_batch(&mut self, bytes: &[u8]) -> PyResult<()> {
+        self.inner.set_ram_batch(bytes).map_err(map_error)
     }
 
     fn nametable_batch<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyBytes>> {

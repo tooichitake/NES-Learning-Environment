@@ -345,7 +345,7 @@ class NESMultiPlayerEnv(ParallelEnv):
         return observations, rewards, terminations, truncations, infos
 
     def render(self):
-        return self._multi_screen_rgb()
+        return self.get_screen_rgb()
 
     def close(self) -> None:
         return None
@@ -361,10 +361,15 @@ class NESMultiPlayerEnv(ParallelEnv):
         if self.obs_type == "ram":
             return np.frombuffer(self._env.ram(), dtype=np.uint8)
         if self.obs_type == "rgb":
-            return self._multi_screen_rgb()
+            return self.get_screen_rgb()
         return np.frombuffer(self._env.screen_gray(), dtype=np.uint8).reshape((240, 256))
 
-    def _multi_screen_rgb(self) -> np.ndarray:
+    def get_screen_grayscale(self) -> np.ndarray:
+        """Native grayscale screen ``(240, 256)`` of the shared console (all ports share one screen)."""
+        return np.frombuffer(self._env.screen_gray(), dtype=np.uint8).reshape((240, 256))
+
+    def get_screen_rgb(self) -> np.ndarray:
+        """Native RGB screen ``(240, 256, 3)`` of the shared console (all ports share one screen)."""
         return np.frombuffer(self._env.screen_rgb(), dtype=np.uint8).reshape((240, 256, 3))
 
     def get_ram(self) -> np.ndarray:
