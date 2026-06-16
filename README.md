@@ -69,7 +69,7 @@ Requires a Rust toolchain (1.85+) and [maturin](https://www.maturin.rs/).
 pip install maturin
 maturin develop --release          # build + install into the active environment
 # optional features:
-#   --features viewer        # in-process SDL window for render_mode="human"
+#   --features viewer        # optional SDL2 native window for render_mode="human"
 #   --features audio-synth   # APU audio synthesis (off by default for training)
 ```
 
