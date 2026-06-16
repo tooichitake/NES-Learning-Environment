@@ -1,20 +1,17 @@
-# NESLE — NES Learning Environment
+# NESLE: NES Learning Environment
 
 [![build-wheels](https://github.com/tooichitake/nesle/actions/workflows/build-wheels.yml/badge.svg)](https://github.com/tooichitake/nesle/actions/workflows/build-wheels.yml)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/)
 [![License: GPL-2.0](https://img.shields.io/badge/license-GPL--2.0-blue.svg)](LICENSE)
 
-NESLE is an original, Rust-native reinforcement-learning environment for the
-Nintendo Entertainment System (NES). The cycle-accurate NES core, the RL
-environment layer, the preprocessing pipeline, and batched/vectorized stepping
-are all written from scratch in Rust and exposed to Python through a single
-compiled extension.
+NESLE is a Rust-native reinforcement learning environment for the Nintendo
+Entertainment System (NES). It provides a cycle-accurate NES core, game-specific
+RL environments, preprocessing, vectorized stepping, and Python bindings through
+a single compiled extension.
 
-NESLE **implements the standard Gymnasium (single-agent) and PettingZoo
-(multi-agent) interfaces**, so it drops straight into the existing RL ecosystem
-(Stable-Baselines3, CleanRL, …) with no glue code. The interfaces are the only
-thing borrowed — the emulator, environments, observation/preprocessing pipeline,
-vectorization, memory access, and tooling are all NESLE's own.
+NESLE implements the standard Gymnasium interface for single-agent environments
+and the PettingZoo interface for multi-agent environments, so it works with
+common RL libraries such as Stable-Baselines3 and CleanRL.
 
 ```python
 import gymnasium as gym
@@ -33,29 +30,23 @@ obs, reward, terminated, truncated, info = env.step(env.action_space.sample())
 
 ## Features
 
-- **Rust-native NES core** — deterministic and integer-only, so a run is
-  bit-for-bit reproducible across platforms; verified cycle-accurate against a
-  reference emulator (RAM + rendered framebuffer).
-- **Gymnasium-compatible single-agent envs** and **PettingZoo-compatible
-  multi-agent envs** (2–4 players, last-standing / versus / co-op).
-- **Three observation types** — RGB `(240, 256, 3)`, grayscale `(240, 256)`, and
-  raw RAM `(2048,)`.
-- **Built-in preprocessing** — 112×112 grayscale, frame-skip, 2-frame max-pool,
-  frame-stacking, sticky actions, and no-op resets, selected per env version.
-- **Built-in vectorization in Rust** — a synchronous batched backend and an
-  asynchronous (envpool-style) backend, both with the GIL released.
-- **Direct memory access** — read the full NES RAM and the PPU tile field, and
-  save / restore emulator state (see [Memory & state interface](#memory--state-interface)).
-- **abi3 wheels** — one wheel per platform covers Python 3.10+.
-- **Browser viewer + server** (`nesle-server`) — play live, watch agents, and step
-  the RL env frame-by-frame in the browser (see [Server / viewer](#server--viewer)).
+- Rust-native, deterministic NES core verified against a reference emulator.
+- Gymnasium single-agent environments and PettingZoo multi-agent environments.
+- RGB, grayscale, and raw RAM observations.
+- ALE-style preprocessing with frame skip, max-pooling, frame stacking, no-op
+  resets, and sticky actions.
+- Rust vector environments with synchronous and asynchronous stepping.
+- Direct RAM access, PPU tile-field access, and emulator state save/restore.
+- abi3 wheels for Python 3.10+.
+- Browser viewer and WebSocket server for play, debugging, and agent monitoring.
 
 ## Installation
 
 ### From a release wheel
 
-Pre-built, optimized abi3 wheels (Linux x86-64, Windows x86-64, macOS arm64) are
-attached to each [GitHub Release](https://github.com/tooichitake/nesle/releases).
+Prebuilt abi3 wheels are attached to each
+[GitHub Release](https://github.com/tooichitake/nesle/releases) for Linux x86-64,
+Windows x86-64, and macOS arm64.
 
 ```bash
 pip install nesle-<version>-cp310-abi3-<platform>.whl
@@ -75,22 +66,20 @@ maturin develop --release          # build + install into the active environment
 
 ## ROMs
 
-NES ROMs are copyrighted and live outside the source tree; NESLE resolves one by
-its **SHA-1** (filename-agnostic, validated against NESLE's game table).
+NES ROMs are copyrighted and are not stored in the public source tree. NESLE
+resolves ROMs by SHA-1, independent of filename.
 
-- **Release wheels bundle the ROMs for the supported games**, so you pass **no**
-  `rom_path` — `gym.make("NESLE/<id>")` works out of the box for any
-  [supported game](#supported-games).
-- **A from-source build is ROM-free.** Drop your `.nes` files into the default ROM
-  folder `crates/nesle-py/python/nesle/roms/` (git-ignored) *before*
-  `maturin develop` / `maturin build` and they are bundled just like a release
-  wheel — or resolve them at runtime without rebuilding (order below).
+Release wheels bundle ROMs for the supported games, so `gym.make("NESLE/<id>")`
+works without `rom_path`. Source builds are ROM-free by default. To bundle ROMs
+into a local build, place `.nes` files under
+`crates/nesle-py/python/nesle/roms/` before running `maturin develop` or
+`maturin build`. You can also resolve ROMs at runtime.
 
 Runtime resolution order:
 
-1. an explicit `rom_path=` argument;
-2. a ROM bundled in the installed wheel (the release-wheel default);
-3. a folder registered with `nesle.import_roms(...)`, or pointed at by the
+1. An explicit `rom_path=` argument.
+2. A ROM bundled in the installed wheel.
+3. A folder registered with `nesle.import_roms(...)`, or pointed at by the
    `NESLE_ROMS_DIR` environment variable.
 
 ```python
@@ -99,13 +88,13 @@ import nesle
 
 gym.register_envs(nesle)
 
-# Release wheel: ROMs are bundled -> no rom_path needed.
+# Release wheel: ROMs are bundled, so no rom_path is needed.
 env = gym.make("NESLE/SuperMarioBros-1-1-v3")
 
-# Custom / from-source ROMs: register a folder once (copied + indexed by SHA-1)...
+# Custom or source-build ROMs: register a folder once.
 nesle.import_roms("/path/to/roms")
-#   ...or per-process:  export NESLE_ROMS_DIR=/path/to/roms
-#   ...or per-call:     gym.make("NESLE/SuperMarioBros-1-1-v3", rom_path="/path/to/smb.nes")
+# Or set NESLE_ROMS_DIR=/path/to/roms for the process.
+# Or pass rom_path directly to gym.make(...).
 
 nesle.get_all_game_ids()       # every supported game id
 nesle.get_rom_path(game_id)    # bundled ROM path, if present
@@ -113,14 +102,14 @@ nesle.get_rom_path(game_id)    # bundled ROM path, if present
 
 ## Usage
 
-Four entry points — single- vs multi-agent, each non-vectorized or vectorized:
+NESLE has single-agent and multi-agent APIs, each with a vectorized variant.
 
 | | Non-vectorized | Vectorized |
 |---|---|---|
-| **Single-agent** (Gymnasium) | `gym.make("NESLE/…")` | `gym.make_vec("NESLE/…", num_envs=…)` |
-| **Multi-agent** (PettingZoo) | `nesle.env.parallel_env(env_id="NESLE/…")` | `make_multiplayer_vector_env("NESLE/…", num_envs=…)` |
+| **Single-agent** (Gymnasium) | `gym.make("NESLE/<id>")` | `gym.make_vec("NESLE/<id>", num_envs=N)` |
+| **Multi-agent** (PettingZoo) | `nesle.env.parallel_env(env_id="NESLE/<id>")` | `make_multiplayer_vector_env("NESLE/<id>", num_envs=N)` |
 
-### Single-agent · non-vectorized (Gymnasium)
+### Single-agent Gymnasium
 
 ```python
 import gymnasium as gym
@@ -129,9 +118,9 @@ import nesle
 gym.register_envs(nesle)
 
 # Raw env (v0): pick the observation type.
-raw = gym.make("NESLE/SuperMarioBros-1-1-v0", obs_type="rgb")        # or "grayscale" / "ram"
+raw = gym.make("NESLE/SuperMarioBros-1-1-v0", obs_type="rgb")        # or "grayscale" or "ram"
 
-# Standard preprocessed training env (v3): 112×112 grayscale, frame-skip 4, sticky actions.
+# Standard training env (v3): 112x112 grayscale, frame skip 4, sticky actions.
 env = gym.make("NESLE/SuperMarioBros-1-1-v3")
 obs, info = env.reset(seed=0)
 for _ in range(1000):
@@ -141,7 +130,7 @@ for _ in range(1000):
 env.close()
 ```
 
-### Single-agent · vectorized (Gymnasium)
+### Vectorized Gymnasium
 
 ```python
 import gymnasium as gym
@@ -149,40 +138,40 @@ import nesle
 
 gym.register_envs(nesle)
 
-# Synchronous: preprocessed profiles build in a 4-frame stack.
+# Synchronous vector env.
 vec = gym.make_vec("NESLE/SuperMarioBros-1-1-v3", num_envs=8)
 batch_obs, infos = vec.reset()                       # (8, 4, 112, 112)
 
-# Asynchronous (envpool-style): 0 < batch_size < num_envs.
+# Asynchronous vector env: 0 < batch_size < num_envs.
 avec = gym.make_vec("NESLE/SuperMarioBros-1-1-v3", num_envs=16, batch_size=4)
 avec.async_reset()
 obs, rewards, terms, truncs, info = avec.recv()      # info["env_id"] demuxes
 avec.send(actions)                                   # one action per env in the recv batch
 ```
 
-### Multi-agent · non-vectorized (PettingZoo)
+### Multi-agent PettingZoo
 
 ```python
 import nesle
 from nesle.env import parallel_env
 
-env = parallel_env(env_id="NESLE/SuperC-2P-2-v3")    # release wheels bundle ROMs (no rom_path)
+env = parallel_env(env_id="NESLE/SuperC-2P-2-v3")
 obs, infos = env.reset()
 actions = {agent: env.action_space(agent).sample() for agent in env.agents}
 obs, rewards, terminations, truncations, infos = env.step(actions)
 ```
 
-### Multi-agent · vectorized self-play
+### Vectorized self-play
 
 ```python
 import numpy as np
 from nesle.vector_env import make_multiplayer_vector_env
 
-# K parallel matches, each with `num_players` controller ports (one shared screen / match).
+# K parallel matches, each with `num_players` controller ports.
 venv = make_multiplayer_vector_env("NESLE/Bomberman2-VS-1-v3", num_envs=16)
 obs, infos = venv.reset()                            # (num_envs * num_players, 4, 112, 112)
 
-# One action per AGENT slot, unit-major (slot = unit * num_players + port):
+# One action per agent slot: slot = unit * num_players + port.
 actions = np.random.randint(venv.num_actions, size=venv.num_agents)
 obs, rewards, dones, truncated, infos = venv.step(actions)
 ```
@@ -190,48 +179,47 @@ obs, rewards, dones, truncated, infos = venv.step(actions)
 ## Environments
 
 Env ids follow `NESLE/<game>[-<mode>]-<level>-v<version>`. The optional `<mode>`
-token names the cart's mode / player-count and is absent for single-mode games; the
-exact token differs per game — e.g. Bomberman 2 uses `Normal` / `VS` / `Battle`, while
-Super C and Ice Hockey use `1P` / `2P`. Example ids: `SuperMarioBros-1-1-v3` (no mode),
-`SuperC-2P-2-v3`, `Bomberman2-VS-1-v3`. Call `nesle.get_all_game_ids()` for the exact
-modes each game registers. The version suffix selects the observation / preprocessing
-profile:
+token names the cart mode or player count and is absent for single-mode games.
+Bomberman 2 uses `Normal`, `VS`, and `Battle`; Super C and Ice Hockey use `1P`
+and `2P`. Example ids include `SuperMarioBros-1-1-v3`, `SuperC-2P-2-v3`, and
+`Bomberman2-VS-1-v3`. Call `nesle.get_all_game_ids()` for the registered ids.
+The version suffix selects the observation and preprocessing profile:
 
 | Version | Profile |
 |---|---|
-| `v0` | Raw observation (`obs_type` ∈ `rgb` / `grayscale` / `ram`), configurable action repeat. |
-| `v1` | 112×112 grayscale, frame-skip 4, 2-frame max-pool, terminal-on-life-loss. |
+| `v0` | Raw observation (`obs_type` in `rgb`, `grayscale`, or `ram`), configurable action repeat. |
+| `v1` | 112x112 grayscale, frame skip 4, 2-frame max-pool, terminal-on-life-loss. |
 | `v2` | Same as v1 with sprite-limit removal and max-pool disabled. |
 | `v3` | v2 + sticky actions (`repeat_action_probability = 0.25`). |
 
-**`v3`** (sticky actions, the ALE-standard) is the recommended training profile —
-the examples above use it. `NoFrameskip` variants keep the observation semantics
-but set action repeat to 1. Episode summaries (`info["episode"]`) are produced by
-Gymnasium's `RecordEpisodeStatistics` wrapper, not by the env itself.
+`v3` is the recommended training profile and matches the ALE sticky-action
+setting. `NoFrameskip` variants keep the same observation semantics with action
+repeat set to 1. Episode summaries (`info["episode"]`) are produced by
+Gymnasium's `RecordEpisodeStatistics` wrapper.
 
 ![Observation pipeline: raw RGB to grayscale to 112x112 obs](assets/obs_pipeline.png)
 
-<sub>The preprocessing pipeline: native RGB → grayscale → 112×112 training observation.</sub>
+<sub>The preprocessing pipeline: native RGB to grayscale to 112x112 training observation.</sub>
 
 ## Supported games
 
-20 games ship today. Build an env-id as `NESLE/<stem>-<level>-v3`; call
+20 games ship today. Build an env id as `NESLE/<stem>-<level>-v3`; call
 `nesle.get_all_game_ids()` for the authoritative list at runtime, and
 `nesle.parse_env_id(env_id)` to inspect one.
 
 **Single-agent (Gymnasium):**
-SuperMarioBros · SuperMarioBros2 · SuperMarioBros3 · KungFu · Castlevania ·
-SuperC-1P · AdventureIsland · DuckTales · MegaMan2 · PacMan · MarioBros ·
-Bomberman · Bomberman2-Normal · IceHockey-1P
+SuperMarioBros, SuperMarioBros2, SuperMarioBros3, KungFu, Castlevania,
+SuperC-1P, AdventureIsland, DuckTales, MegaMan2, PacMan, MarioBros,
+Bomberman, Bomberman2-Normal, IceHockey-1P
 
 **Multi-agent (PettingZoo):**
-SuperC-2P · IceHockey-2P · Bomberman2-VS · Bomberman2-Battle · RCProAm2-4P ·
+SuperC-2P, IceHockey-2P, Bomberman2-VS, Bomberman2-Battle, RCProAm2-4P,
 Roundball2on2-4P
 
 ## Memory & state interface
 
-NESLE exposes the live machine state, not just pixels — for reward shaping,
-scripted agents/opponents, RAM-map reverse engineering, and debugging.
+NESLE exposes live machine state for reward shaping, scripted agents, RAM-map
+reverse engineering, and debugging.
 
 ```python
 import gymnasium as gym
@@ -240,53 +228,51 @@ import nesle
 gym.register_envs(nesle)
 
 env = gym.make("NESLE/SuperMarioBros-1-1-v0", obs_type="ram")
-obs, info = env.reset()          # obs IS the 2048-byte NES RAM (uint8)
+obs, info = env.reset()          # obs is the 2048-byte NES RAM (uint8)
 
 # Read RAM at any time, independent of obs_type:
-ram = env.unwrapped.get_ram()    # np.uint8 (2048,)
+ram = env.unwrapped.get_ram()    # np.uint8, shape (2048,)
 value = int(ram[0x075A])         # e.g. some game-specific address
 
 # Other live-state accessors on the single-agent env:
 env.unwrapped.get_screen_grayscale()   # (240, 256) uint8
 env.unwrapped.get_action_meanings()    # ["NOOP", "RIGHT", ...]
 
-# Save / restore the full emulator state:
+# Save and restore the full emulator state:
 snap = env.unwrapped.clone_state()
 env.unwrapped.restore_state(snap)      # also: restore_state_blob(bytes)
 ```
 
-For batched / multi-agent runs, `NESMultiPlayerVectorEnv` exposes per-match
-memory directly (the preprocessed image observation does not carry it):
+For batched and multi-agent runs, `NESMultiPlayerVectorEnv` exposes per-match
+memory directly:
 
 ```python
 from nesle.vector_env import make_multiplayer_vector_env
 venv = make_multiplayer_vector_env("NESLE/Bomberman2-VS-1-v3", num_envs=16)
 venv.reset()
-ram = venv.get_ram()          # (num_envs, 2048) CPU RAM, one per match
-field = venv.get_nametable()  # (num_envs, vram) PPU tile field (walls / bricks / bombs / …)
+ram = venv.get_ram()          # (num_envs, 2048) CPU RAM
+field = venv.get_nametable()  # (num_envs, vram) PPU tile field
 ```
 
-## Server / viewer
+## Server and viewer
 
-`nesle-server` is a WebSocket console host that serves a browser thin-client
-**viewer** — run any supported game live in the browser, watch RL agents play, or
-step the env frame-by-frame. The browser only renders streamed frames and sends
-controller input; the emulator, reward, preprocessing, and start-state logic all
-stay in Rust.
+`nesle-server` is a WebSocket console host with a browser viewer. It can run any
+supported game, stream frames to the browser, accept controller input, and step
+RL environments frame by frame. Emulation, reward logic, preprocessing, and
+start-state handling stay in Rust.
 
-![NESLE browser viewer — Play / Debug / Agent modes](assets/server-ui.png)
+![NESLE browser viewer: Play, Debug, and Agent modes](assets/server-ui.png)
 
-<sub>The `nesle-server` browser viewer in all three modes — **Play** (human play), **Debug** (stepped env + observation), **Agent** (connected RL agents).</sub>
+<sub>The `nesle-server` browser viewer in Play, Debug, and Agent modes.</sub>
 
-Three modes (the segmented control at the top):
-- **Play** — faithful 60 Hz play with keyboard controllers (1–4 players).
-- **Debug** — advance the *preprocessed* env one frame-skip window at a time and
-  watch the agent's observation, reward, lives, and terminal flags.
-- **Agent** — humans and RL agents share one console as peer players, with a live
-  per-agent observation grid (the Agent Monitor).
+The viewer has three modes:
 
-Plus **Record** (replay-format input capture, replayable by the Python envs) and
-**Dump RAM** (2 KB work RAM → base64).
+- Play: 60 Hz play with keyboard controllers for 1 to 4 players.
+- Debug: step the preprocessed env and inspect observation, reward, lives, and
+  terminal flags.
+- Agent: connect RL agents as peer players and monitor per-agent observations.
+
+It also supports replay recording and RAM dumps.
 
 ```bash
 cargo run -p nesle-server                          # then open http://127.0.0.1:8090
@@ -295,24 +281,23 @@ cargo run -p nesle-server --features audio-synth   # with APU audio
 
 | Env var | Default | Meaning |
 |---|---|---|
-| `NESLE_SERVER_ADDR` | `127.0.0.1:8090` | HTTP / WebSocket bind address |
+| `NESLE_SERVER_ADDR` | `127.0.0.1:8090` | HTTP and WebSocket bind address |
 | `NESLE_WEB_DIR` | `crates/nesle-server/web` | static UI directory |
 
-Pick a game + level in the UI and the server **auto-loads** that game's packaged
-ROM by SHA-1 (no upload); **Upload ROM** handles unregistered ROMs.
+Pick a game and level in the UI and the server loads the packaged ROM by SHA-1.
+Use Upload ROM for unregistered ROMs.
 
 ### Connecting an RL agent (`nesle.agent_client`)
 
 `Agent` mode accepts external RL agents over WebSocket. With a game loaded in the
-browser (a human owns the console), connect an agent peer that receives its
-observation stream and sends back actions:
+browser, connect an agent peer that receives observations and sends actions:
 
 ```python
 import asyncio
 from nesle.agent_client import AgentClient
 
-def policy(obs):                  # obs: np.uint8, (H, W) grayscale or (H, W, channels)
-    return 0                      # return an action index (0 .. len(action_set) - 1)
+def policy(obs):                  # np.uint8, (H, W) or (H, W, channels)
+    return 0                      # action index
 
 asyncio.run(AgentClient(name="my-agent").play(
     env_id="NESLE/SuperMarioBros-1-1-v3",   # declares the agent's observation profile
@@ -320,13 +305,13 @@ asyncio.run(AgentClient(name="my-agent").play(
 ))
 ```
 
-Or from the CLI (random actions if no policy is given):
+The CLI client sends random actions when no policy is provided:
 
 ```bash
 python -m nesle.agent_client --env-id NESLE/SuperMarioBros-1-1-v3
 ```
 
-Needs the `agent` extra (`pip install nesle[agent]`, which brings `websockets`) and a
+The agent client requires the `agent` extra (`pip install nesle[agent]`) and a
 running `nesle-server` with the matching game loaded.
 
 ## Citing
@@ -368,17 +353,18 @@ the ALE papers:
 
 ## Acknowledgments
 
-NESLE is an original implementation; it mirrors conventions from, and is verified
-against, prior work:
+NESLE follows conventions from related RL environment projects and is verified
+against prior emulator work:
 
-- **[Gymnasium](https://github.com/Farama-Foundation/Gymnasium)** /
-  **[PettingZoo](https://github.com/Farama-Foundation/PettingZoo)** (Farama Foundation) —
-  the single- and multi-agent interfaces NESLE implements.
-- **Arcade Learning Environment** (Bellemare et al. 2013; Machado et al. 2018) — the
-  observation / preprocessing / sticky-action conventions NESLE follows.
-- **gym-super-mario-bros / nes-py** (Christian Kauten) — single-agent NES reward conventions.
-- **[Mesen2](https://github.com/SourMesen/Mesen2)** — the reference emulator NESLE's core
-  is cycle-verified against (RAM + framebuffer).
+- **[Gymnasium](https://github.com/Farama-Foundation/Gymnasium)** and
+  **[PettingZoo](https://github.com/Farama-Foundation/PettingZoo)** for the
+  single-agent and multi-agent interfaces.
+- **Arcade Learning Environment** (Bellemare et al. 2013; Machado et al. 2018)
+  for observation, preprocessing, and sticky-action conventions.
+- **gym-super-mario-bros and nes-py** (Christian Kauten) for single-agent NES
+  reward conventions.
+- **[Mesen2](https://github.com/SourMesen/Mesen2)** as the reference emulator
+  for RAM and framebuffer verification.
 
 ## License
 
