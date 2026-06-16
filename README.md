@@ -2,7 +2,7 @@
 
 [![build-wheels](https://github.com/tooichitake/nesle/actions/workflows/build-wheels.yml/badge.svg)](https://github.com/tooichitake/nesle/actions/workflows/build-wheels.yml)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/)
-[![License: GPL-2.0](https://img.shields.io/badge/license-GPL--2.0-blue.svg)](LICENSE)
+[![License: GPL-3.0](https://img.shields.io/badge/license-GPL--3.0-blue.svg)](LICENSE)
 
 NESLE is a Rust-native reinforcement learning environment for the Nintendo
 Entertainment System (NES). It provides a cycle-accurate NES core, game-specific
@@ -370,6 +370,6 @@ against prior emulator work:
 
 Copyright (C) 2026 Zhiyuan Zhao.
 
-NESLE is licensed under [GPL-2.0-only](LICENSE). This license covers the source in
+NESLE is licensed under [GPL-3.0-only](LICENSE). This license covers the source in
 this repository; it grants no rights to NES ROMs, which belong to their respective
 copyright holders.

@@ -11,7 +11,7 @@ members = [
 [workspace.package]
 edition = "2021"
 version = "0.1.0"
-license = "GPL-2.0-only"
+license = "GPL-3.0-only"
 rust-version = "1.85"
 
 # Profiles apply to all workspace members. Per-crate overrides are not
