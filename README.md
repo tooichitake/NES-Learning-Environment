@@ -97,6 +97,8 @@ Runtime resolution order:
 import gymnasium as gym
 import nesle
 
+gym.register_envs(nesle)
+
 # Release wheel: ROMs are bundled -> no rom_path needed.
 env = gym.make("NESLE/SuperMarioBros-1-1-v3")
 
@@ -233,6 +235,10 @@ scripted agents/opponents, RAM-map reverse engineering, and debugging.
 
 ```python
 import gymnasium as gym
+import nesle
+
+gym.register_envs(nesle)
+
 env = gym.make("NESLE/SuperMarioBros-1-1-v0", obs_type="ram")
 obs, info = env.reset()          # obs IS the 2048-byte NES RAM (uint8)
 

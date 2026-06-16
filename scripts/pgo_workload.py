@@ -15,11 +15,10 @@ workload never crashes. argv[1] (a ROM path) is accepted but ignored.
 import os
 
 import gymnasium as gym
-import nesle  # noqa: F401
+import nesle
 import numpy as np
 
-if hasattr(nesle, "register_envs"):
-    nesle.register_envs()
+gym.register_envs(nesle)
 
 ROMS = "crates/nesle-py/python/nesle/roms"
 
